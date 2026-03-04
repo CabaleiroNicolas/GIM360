@@ -84,47 +84,81 @@ AUTH_URL="http://localhost:3000"
 4. NextAuth issues JWT cookie with `id` and `role`
 5. Server components call `auth()` to read session: `session.user.id`, `session.user.role`
 
+### Folder structure
+
+```
+lib/                        ← Infrastructure / config (no business logic)
+  auth.ts                   ← NextAuth config
+  db.ts                     ← Prisma singleton
+  utils.ts                  ← cn() helper
+
+modules/                    ← Business logic, one folder per domain
+  gyms/
+    gyms.service.ts         ← DB queries + business rules
+    gyms.schema.ts          ← Zod input validation + inferred types
+  students/
+  trainers/
+  groups/
+  schedules/
+
+app/api/                    ← HTTP layer only (thin controllers)
+  auth/[...nextauth]/       ← NextAuth internals, do not touch
+  gyms/
+    route.ts                ← GET /api/gyms, POST /api/gyms
+    [id]/route.ts           ← GET, PATCH, DELETE /api/gyms/:id
+  students/
+  trainers/
+  groups/
+  schedules/
+
+app/(auth)/                 ← Public pages
+app/(dashboard)/            ← Protected pages
+```
+
 ### Backend architecture — Route Handlers only
 
-All backend logic lives exclusively in `app/api/` as Route Handlers. No Server Actions for data mutations. This keeps a clean frontend/backend separation and ensures the API can be consumed by a native mobile app in the future.
+All backend logic lives in `modules/` (services + schemas). `app/api/` route handlers are thin: auth check → validate input → call service → return response. No Server Actions.
 
-```
-app/api/
-  auth/[...nextauth]/   ← NextAuth internals, do not touch
-  gyms/
-    route.ts            ← GET /api/gyms, POST /api/gyms
-    [id]/
-      route.ts          ← GET, PATCH, DELETE /api/gyms/:id
-  students/
-    route.ts
-    [id]/route.ts
-  ...
-```
+This keeps frontend/backend cleanly separated and allows a future mobile app to consume the same API.
 
 **Auth strategy:**
-- Web: NextAuth cookie session (current). Route Handlers verify via `auth()` from `lib/auth.ts`.
+- Web: NextAuth cookie session. Route Handlers verify via `auth()` from `lib/auth.ts`.
 - Mobile (future): Bearer token in `Authorization` header. Will be added when mobile app is built.
 
 **Route Handler pattern:**
 ```ts
+// app/api/gyms/route.ts — HTTP only, no business logic here
 import { auth } from "@/lib/auth"
 import { NextRequest, NextResponse } from "next/server"
-import { db } from "@/lib/db"
+import { getGymsByOwner, createGym } from "@/modules/gyms/gyms.service"
+import { createGymSchema } from "@/modules/gyms/gyms.schema"
 
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const data = await db.something.findMany()
-  return NextResponse.json(data)
+  const gyms = await getGymsByOwner(session.user.id)
+  return NextResponse.json(gyms)
+}
+
+export async function POST(req: NextRequest) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const body = await req.json()
+  const parsed = createGymSchema.safeParse(body)
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+
+  const gym = await createGym(session.user.id, parsed.data)
+  return NextResponse.json(gym, { status: 201 })
 }
 ```
 
 ### Adding new features
 - **New DB models**: add to `prisma/schema.prisma`, run `prisma migrate dev --name desc`, then `prisma generate`
-- **Import types**: `import type { Student, Group } from "@/app/generated/prisma/client"`
-- **Complex query types**: `import type { Prisma } from "@/app/generated/prisma/client"` → use `Prisma.XGetPayload<{ include: ... }>`
-- **New API endpoints**: create under `app/api/` following the pattern above
+- **New domain**: create `modules/<domain>/<domain>.service.ts` + `<domain>.schema.ts`, then `app/api/<domain>/route.ts`
+- **Import Prisma types**: `import type { Student, Group } from "@/app/generated/prisma/client"`
+- **Complex query types**: `import type { Prisma } from "@/app/generated/prisma/client"` → `Prisma.XGetPayload<{ include: ... }>`
 - **New protected pages**: place under `app/(dashboard)/` — `proxy.ts` covers them automatically
 - **New public routes**: place under `app/(auth)/` or add the path to the proxy matcher exclusions
 - **UI components**: `components/ui/` for generic components, `components/layout/` for Sidebar/Navbar
