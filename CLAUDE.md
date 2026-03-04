@@ -84,10 +84,47 @@ AUTH_URL="http://localhost:3000"
 4. NextAuth issues JWT cookie with `id` and `role`
 5. Server components call `auth()` to read session: `session.user.id`, `session.user.role`
 
+### Backend architecture — Route Handlers only
+
+All backend logic lives exclusively in `app/api/` as Route Handlers. No Server Actions for data mutations. This keeps a clean frontend/backend separation and ensures the API can be consumed by a native mobile app in the future.
+
+```
+app/api/
+  auth/[...nextauth]/   ← NextAuth internals, do not touch
+  gyms/
+    route.ts            ← GET /api/gyms, POST /api/gyms
+    [id]/
+      route.ts          ← GET, PATCH, DELETE /api/gyms/:id
+  students/
+    route.ts
+    [id]/route.ts
+  ...
+```
+
+**Auth strategy:**
+- Web: NextAuth cookie session (current). Route Handlers verify via `auth()` from `lib/auth.ts`.
+- Mobile (future): Bearer token in `Authorization` header. Will be added when mobile app is built.
+
+**Route Handler pattern:**
+```ts
+import { auth } from "@/lib/auth"
+import { NextRequest, NextResponse } from "next/server"
+import { db } from "@/lib/db"
+
+export async function GET(req: NextRequest) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const data = await db.something.findMany()
+  return NextResponse.json(data)
+}
+```
+
 ### Adding new features
 - **New DB models**: add to `prisma/schema.prisma`, run `prisma migrate dev --name desc`, then `prisma generate`
 - **Import types**: `import type { Student, Group } from "@/app/generated/prisma/client"`
 - **Complex query types**: `import type { Prisma } from "@/app/generated/prisma/client"` → use `Prisma.XGetPayload<{ include: ... }>`
-- **New protected routes**: place under `app/(dashboard)/` — `proxy.ts` covers them automatically
+- **New API endpoints**: create under `app/api/` following the pattern above
+- **New protected pages**: place under `app/(dashboard)/` — `proxy.ts` covers them automatically
 - **New public routes**: place under `app/(auth)/` or add the path to the proxy matcher exclusions
 - **UI components**: `components/ui/` for generic components, `components/layout/` for Sidebar/Navbar
