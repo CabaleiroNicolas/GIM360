@@ -12,7 +12,7 @@ export function Tabs<T extends string>({ tabs, active, onChange }: TabsProps<T>)
           <button
             key={key}
             onClick={() => onChange(key)}
-            className={`rounded-md px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
+            className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
               active === key
                 ? "bg-[#111110] text-white"
                 : "text-[#68685F] hover:text-[#111110] hover:bg-[#F0EFEB]"

@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/ui/PageHeader"
 import { SearchToolbar } from "@/components/ui/SearchToolbar"
 import { DataTable } from "@/components/ui/DataTable"
 import { InlineForm } from "@/components/ui/InlineForm"
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 
 type FixedExpense = { id: string; name: string; amount: string; createdAt: string }
 type EditForm = { name: string; amount: string }
@@ -30,6 +31,7 @@ export default function ExpensesView({ gymId }: { gymId: string }) {
   const [editSubmitting, setEditSubmitting] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   type SortKey = "name" | "amount"
   const [sortKey, setSortKey] = useState<SortKey>("name")
@@ -81,7 +83,6 @@ export default function ExpensesView({ gymId }: { gymId: string }) {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("¿Eliminar este gasto fijo?")) return
     setDeletingId(id)
     const res = await fetch(`/api/expenses/${id}?gymId=${gymId}`, { method: "DELETE" })
     if (res.ok) await refetch()
@@ -134,7 +135,7 @@ export default function ExpensesView({ gymId }: { gymId: string }) {
           { key: "actions", header: "", align: "right", render: (exp) => (
             <div className="flex items-center justify-end gap-3">
               <Button variant="link" onClick={() => startEdit(exp)}>Editar</Button>
-              <Button variant="danger" onClick={() => handleDelete(exp.id)} disabled={deletingId === exp.id}>
+              <Button variant="danger" onClick={() => setConfirmId(exp.id)} disabled={deletingId === exp.id}>
                 {deletingId === exp.id ? "…" : "Eliminar"}
               </Button>
             </div>
@@ -175,6 +176,15 @@ export default function ExpensesView({ gymId }: { gymId: string }) {
             </tr>
           )
         }}
+      />
+
+      <ConfirmDialog
+        open={confirmId !== null}
+        title="Eliminar gasto fijo"
+        message="¿Estás seguro? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        onConfirm={() => { const id = confirmId!; setConfirmId(null); handleDelete(id) }}
+        onCancel={() => setConfirmId(null)}
       />
     </div>
   )

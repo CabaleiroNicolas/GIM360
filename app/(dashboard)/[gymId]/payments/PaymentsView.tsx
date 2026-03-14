@@ -158,6 +158,7 @@ export default function PaymentsView({ gymId }: { gymId: string }) {
         data={displayed}
         loading={loading}
         emptyMessage={search ? "Sin resultados para esa búsqueda." : "No hay alumnos inscriptos en este período."}
+        emptyHint={!search ? "Las cuotas se generan automáticamente cuando hay alumnos inscriptos en grupos." : undefined}
         minWidth="580px"
         rowKey={(p) => p.id}
       />

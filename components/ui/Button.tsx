@@ -18,5 +18,5 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export function Button({ variant = "primary", className, ...props }: ButtonProps) {
-  return <button className={cn(variants[variant], className)} {...props} />
+  return <button className={cn("cursor-pointer", variants[variant], className)} {...props} />
 }

@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/ui/PageHeader"
 import { SearchToolbar } from "@/components/ui/SearchToolbar"
 import { DataTable } from "@/components/ui/DataTable"
 import { InlineForm } from "@/components/ui/InlineForm"
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 
 type ContractType = "HOURLY" | "MONTHLY"
 type Trainer = { id: string; name: string; contractType: ContractType; active: boolean }
@@ -31,6 +32,7 @@ export default function TrainersView({ gymId }: { gymId: string }) {
   const [editSubmitting, setEditSubmitting] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   type SortKey = "name" | "contract"
   const [sortKey, setSortKey] = useState<SortKey>("name")
@@ -95,7 +97,7 @@ export default function TrainersView({ gymId }: { gymId: string }) {
       <div className="flex items-center gap-2">
         <button
           onClick={() => setShowInactive((v) => !v)}
-          className={`text-xs font-medium transition-colors ${
+          className={`cursor-pointer text-xs font-medium transition-colors ${
             showInactive ? "text-[#111110] underline underline-offset-2" : "text-[#68685F] hover:text-[#111110]"
           }`}
         >
@@ -141,7 +143,7 @@ export default function TrainersView({ gymId }: { gymId: string }) {
             <div className="flex items-center justify-end gap-3">
               <Button variant="link" onClick={() => startEdit(t)}>Editar</Button>
               {t.active && (
-                <Button variant="danger" onClick={() => handleDeactivate(t.id)} disabled={deactivatingId === t.id}>
+                <Button variant="danger" onClick={() => setConfirmId(t.id)} disabled={deactivatingId === t.id}>
                   {deactivatingId === t.id ? "…" : "Desactivar"}
                 </Button>
               )}
@@ -152,6 +154,7 @@ export default function TrainersView({ gymId }: { gymId: string }) {
         loading={loading}
         error={error}
         emptyMessage={search ? "Sin resultados para esa búsqueda." : showInactive ? "No hay entrenadores registrados." : "No hay entrenadores activos."}
+        emptyHint={!search ? "Agregá el primer entrenador con el botón de arriba." : undefined}
         minWidth="400px"
         rowKey={(t) => t.id}
         rowClassName={(t, i) => `hover:bg-[#FAFAF9] transition-colors ${i > 0 ? "border-t border-[#F7F6F3]" : ""} ${!t.active ? "opacity-50" : ""}`}
@@ -186,6 +189,15 @@ export default function TrainersView({ gymId }: { gymId: string }) {
             </tr>
           )
         }}
+      />
+
+      <ConfirmDialog
+        open={confirmId !== null}
+        title="Desactivar entrenador"
+        message="Ya no aparecerá en la lista activa. Podés volver a verlo activando 'Mostrar inactivos'."
+        confirmLabel="Desactivar"
+        onConfirm={() => { const id = confirmId!; setConfirmId(null); handleDeactivate(id) }}
+        onCancel={() => setConfirmId(null)}
       />
     </div>
   )

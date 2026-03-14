@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/ui/PageHeader"
 import { SearchToolbar } from "@/components/ui/SearchToolbar"
 import { DataTable } from "@/components/ui/DataTable"
 import { InlineForm } from "@/components/ui/InlineForm"
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 
 type MedicalClearance = "PENDING" | "APPROVED" | "EXPIRED"
 
@@ -47,6 +48,7 @@ export default function StudentsView({ gymId }: { gymId: string }) {
   const [editSubmitting, setEditSubmitting] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   type SortKey = "lastName" | "firstName" | "dueDay" | "medical"
   const [sortKey, setSortKey] = useState<SortKey>("lastName")
@@ -193,7 +195,7 @@ export default function StudentsView({ gymId }: { gymId: string }) {
             <div className="flex items-center justify-end gap-3">
               <Button variant="link" onClick={() => startEdit(s)}>Editar</Button>
               {s.leftAt === null && (
-                <Button variant="danger" onClick={() => handleDelete(s.id)} disabled={deletingId === s.id}>
+                <Button variant="danger" onClick={() => setConfirmId(s.id)} disabled={deletingId === s.id}>
                   {deletingId === s.id ? "…" : "Dar de baja"}
                 </Button>
               )}
@@ -204,6 +206,7 @@ export default function StudentsView({ gymId }: { gymId: string }) {
         loading={loading}
         error={error}
         emptyMessage={search ? "Sin resultados para esa búsqueda." : filter === "ACTIVOS" ? "No hay alumnos activos." : "No hay alumnos registrados."}
+        emptyHint={!search ? "Agregá el primer alumno con el botón de arriba." : undefined}
         minWidth="680px"
         rowKey={(s) => s.id}
         renderRow={(s, i, defaultRow) => {
@@ -242,6 +245,15 @@ export default function StudentsView({ gymId }: { gymId: string }) {
             </tr>
           )
         }}
+      />
+
+      <ConfirmDialog
+        open={confirmId !== null}
+        title="Dar de baja al alumno"
+        message="Se marcará como inactivo y dejará de aparecer en la lista activa. Podés verlo activando 'Todos'."
+        confirmLabel="Dar de baja"
+        onConfirm={() => { const id = confirmId!; setConfirmId(null); handleDelete(id) }}
+        onCancel={() => setConfirmId(null)}
       />
     </div>
   )

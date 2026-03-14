@@ -122,7 +122,7 @@ export default function MetricsView({ gymId }: { gymId: string }) {
       <div className="flex items-center gap-1 border-b border-[#E5E4E0]">
         {VIEWS.map(({ id, label }) => (
           <button key={id} onClick={() => setActiveView(id)}
-            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            className={`cursor-pointer px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
               activeView === id ? "border-[#111110] text-[#111110]" : "border-transparent text-[#A5A49D] hover:text-[#68685F]"
             }`}
           >{label}</button>
@@ -190,7 +190,7 @@ export default function MetricsView({ gymId }: { gymId: string }) {
                 <div className="rounded-xl border border-[#E5E4E0] bg-white overflow-hidden">
                   <div className="px-5 py-3.5 border-b border-[#F0EFEB] flex items-center justify-between">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#A5A49D]">Grupos · resumen</p>
-                    <button onClick={() => setActiveView("grupos")} className="text-xs font-medium text-[#68685F] hover:text-[#111110] transition-colors">Ver detalle →</button>
+                    <button onClick={() => setActiveView("grupos")} className="cursor-pointer text-xs font-medium text-[#68685F] hover:text-[#111110] transition-colors">Ver detalle →</button>
                   </div>
                   <div className="divide-y divide-[#F7F6F3]">
                     {groupMetrics.map((g) => (

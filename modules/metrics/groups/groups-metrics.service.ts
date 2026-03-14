@@ -144,7 +144,7 @@ export async function getGroupMetrics(input: MetricsQueryInput): Promise<GroupMe
       trainerCost,
       margin: collectedRevenue - trainerCost,
       trainerCostNote: hasMonthlyTrainer
-        ? "One or more trainers are on MONTHLY contracts. Cost is estimated as hourlyRate × monthly hours; actual salary may differ."
+        ? "Uno o más entrenadores tienen contrato mensual. El costo se estima como tarifa × horas mensuales; el salario real puede diferir."
         : null,
     }
   })

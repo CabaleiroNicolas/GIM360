@@ -10,6 +10,7 @@ import { FormField } from "@/components/ui/FormField"
 import { Tabs } from "@/components/ui/Tabs"
 import { DataTable } from "@/components/ui/DataTable"
 import { InlineForm } from "@/components/ui/InlineForm"
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -139,10 +140,10 @@ function InfoTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <FormField label="Nombre" required>
-              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Ej: Nivel Inicial" />
             </FormField>
             <FormField label="Precio mensual" required>
-              <Input type="number" min="0" step="0.01" value={form.monthlyPrice} onChange={(e) => setForm((f) => ({ ...f, monthlyPrice: e.target.value }))} />
+              <Input type="number" min="0" step="0.01" value={form.monthlyPrice} onChange={(e) => setForm((f) => ({ ...f, monthlyPrice: e.target.value }))} placeholder="Ej: 15000" />
             </FormField>
             <FormField label="Capacidad máx.">
               <Input type="number" min="1" value={form.maxCapacity} onChange={(e) => setForm((f) => ({ ...f, maxCapacity: e.target.value }))} placeholder="Sin límite" />
@@ -150,7 +151,7 @@ function InfoTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
           </div>
           <div className="flex items-center gap-3">
             <Button onClick={handleSave} disabled={submitting}>{submitting ? "Guardando…" : "Guardar"}</Button>
-            <Button variant="secondary" onClick={() => { setEditing(false); setEditError(null) }}>Cancelar</Button>
+            <Button variant="secondary" onClick={() => { setEditing(false); setEditError(null); setForm({ name: group.name, monthlyPrice: String(group.monthlyPrice), maxCapacity: group.maxCapacity != null ? String(group.maxCapacity) : "" }) }}>Cancelar</Button>
           </div>
         </div>
       ) : (
@@ -184,6 +185,7 @@ function SchedulesTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmScheduleId, setConfirmScheduleId] = useState<string | null>(null)
 
   function toggleDay(day: DayOfWeek) {
     setForm((f) => ({ ...f, weekDays: f.weekDays.includes(day) ? f.weekDays.filter((d) => d !== day) : [...f.weekDays, day] }))
@@ -232,7 +234,7 @@ function SchedulesTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
                 const checked = form.weekDays.includes(d.value)
                 return (
                   <button key={d.value} type="button" onClick={() => toggleDay(d.value)}
-                    className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
                       checked ? "bg-[#111110] text-white" : "border border-[#E5E4E0] text-[#68685F] hover:bg-[#F0EFEB] hover:text-[#111110]"
                     }`}
                   >{d.short}</button>
@@ -276,7 +278,7 @@ function SchedulesTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
                   <p className="text-sm text-[#111110] font-medium">{s.startTime} – {s.endTime}</p>
                   <p className="text-xs text-[#A5A49D]">Desde {new Date(s.startDate).toLocaleDateString("es-AR")}</p>
                 </div>
-                <Button variant="danger" onClick={() => handleDelete(s.id)} disabled={deletingId === s.id}>
+                <Button variant="danger" onClick={() => setConfirmScheduleId(s.id)} disabled={deletingId === s.id}>
                   {deletingId === s.id ? "…" : "Eliminar"}
                 </Button>
               </div>
@@ -284,6 +286,15 @@ function SchedulesTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmScheduleId !== null}
+        title="Eliminar horario"
+        message="Esta acción no se puede deshacer. El horario se eliminará permanentemente."
+        confirmLabel="Eliminar"
+        onConfirm={() => { const id = confirmScheduleId!; setConfirmScheduleId(null); handleDelete(id) }}
+        onCancel={() => setConfirmScheduleId(null)}
+      />
     </div>
   )
 }
@@ -298,6 +309,7 @@ function StudentsTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
   const [enrollError, setEnrollError] = useState<string | null>(null)
   const [unenrollingId, setUnenrollingId] = useState<string | null>(null)
   const [showPicker, setShowPicker] = useState(false)
+  const [confirmStudentId, setConfirmStudentId] = useState<string | null>(null)
 
   const enrolledIds = new Set(group.students.map((s) => s.student.id))
 
@@ -371,7 +383,7 @@ function StudentsTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
           { key: "name", header: "Alumno", render: (e: EnrolledStudent) => <span className="font-medium text-[#111110]">{e.student.firstName} {e.student.lastName}</span> },
           { key: "enrolledAt", header: "Inscripto el", render: (e: EnrolledStudent) => <span className="text-[#68685F]">{new Date(e.enrolledAt).toLocaleDateString("es-AR")}</span> },
           { key: "actions", header: "", align: "right" as const, render: (e: EnrolledStudent) => (
-            <Button variant="danger" onClick={() => handleUnenroll(e.student.id)} disabled={unenrollingId === e.student.id}>
+            <Button variant="danger" onClick={() => setConfirmStudentId(e.student.id)} disabled={unenrollingId === e.student.id}>
               {unenrollingId === e.student.id ? "…" : "Desinscribir"}
             </Button>
           )},
@@ -379,8 +391,18 @@ function StudentsTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
         data={group.students}
         loading={false}
         emptyMessage="No hay alumnos inscriptos en este grupo."
+        emptyHint="Usá el botón '+ Inscribir alumno' para agregar alumnos."
         minWidth="400px"
         rowKey={(e) => e.id}
+      />
+
+      <ConfirmDialog
+        open={confirmStudentId !== null}
+        title="Desinscribir alumno"
+        message="Se quitará al alumno de este grupo. Podrás volver a inscribirlo cuando quieras."
+        confirmLabel="Desinscribir"
+        onConfirm={() => { const id = confirmStudentId!; setConfirmStudentId(null); handleUnenroll(id) }}
+        onCancel={() => setConfirmStudentId(null)}
       />
     </div>
   )
@@ -397,6 +419,7 @@ function TrainersTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
   const [assignError, setAssignError] = useState<string | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [showPicker, setShowPicker] = useState(false)
+  const [confirmTrainerId, setConfirmTrainerId] = useState<string | null>(null)
 
   const assignedIds = new Set(group.trainers.map((t) => t.trainer.id))
 
@@ -483,7 +506,7 @@ function TrainersTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
             </span>
           )},
           { key: "actions", header: "", align: "right" as const, render: (t: AssignedTrainer) => (
-            <Button variant="danger" onClick={() => handleRemove(t.trainer.id)} disabled={removingId === t.trainer.id}>
+            <Button variant="danger" onClick={() => setConfirmTrainerId(t.trainer.id)} disabled={removingId === t.trainer.id}>
               {removingId === t.trainer.id ? "…" : "Remover"}
             </Button>
           )},
@@ -491,8 +514,18 @@ function TrainersTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
         data={group.trainers}
         loading={false}
         emptyMessage="No hay entrenadores asignados a este grupo."
+        emptyHint="Usá el botón '+ Asignar entrenador' para agregar uno."
         minWidth="460px"
         rowKey={(t) => t.id}
+      />
+
+      <ConfirmDialog
+        open={confirmTrainerId !== null}
+        title="Remover entrenador"
+        message="Se quitará al entrenador de este grupo. Podrás volver a asignarlo cuando quieras."
+        confirmLabel="Remover"
+        onConfirm={() => { const id = confirmTrainerId!; setConfirmTrainerId(null); handleRemove(id) }}
+        onCancel={() => setConfirmTrainerId(null)}
       />
     </div>
   )

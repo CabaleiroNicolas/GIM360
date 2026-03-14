@@ -7,6 +7,69 @@ allowed-tools: Read, Write, Glob, Bash
 
 # Create frontend view for: $ARGUMENTS
 
+## PRINCIPIO FUNDAMENTAL — UX para usuarios no técnicos
+
+> **CRÍTICO.** El usuario final de GYM360 es el dueño o recepcionista de un gimnasio, no un desarrollador. La interfaz debe ser tan clara que alguien que la usa por primera vez no necesite explicación. Nunca dejes ambigüedades.
+
+### Reglas de usabilidad obligatorias
+
+**Idioma — todo en español**
+- Todo texto visible al usuario debe estar en español: labels, botones, placeholders, mensajes de error, tooltips y confirmaciones.
+- El `<html>` root debe tener `lang="es"` (`app/layout.tsx`) para que el navegador renderice los widgets nativos (`<input type="date">`, `<input type="time">`, `<input type="number">`, `<input type="month">`) en español. Sin esto, los tooltips de los spinners y los calendarios del navegador aparecen en inglés ("Increment", "Decrement", nombres de meses en inglés).
+- Nunca usar "Submit", "OK", "Confirm", "Cancel" ni ninguna palabra en inglés en la UI.
+
+**Textos y etiquetas**
+- Toda acción debe tener un label en español claro y en modo imperativo: "Guardar", "Dar de baja", "Inscribir alumno" — nunca íconos solos sin texto.
+- Los placeholders de inputs deben mostrar un ejemplo real: `placeholder="Ej: 10"`, `placeholder="Ej: Carlos López"`. Nunca dejar el placeholder vacío.
+- Los campos requeridos deben marcarse con ` *` en el label y mostrar el error exacto si se intenta guardar vacío: "El nombre es obligatorio.", no "Required field".
+- Los mensajes de estado vacío (`emptyMessage`) deben explicar el contexto: "No hay alumnos activos." no "Sin datos.". Agregar `emptyHint` con la acción a tomar: "Creá el primer alumno con el botón de arriba."
+
+**Feedback de acciones**
+- Mientras se envía un formulario, el botón primary debe cambiar su texto: `{submitting ? "Guardando…" : "Guardar"}`. Nunca deshabilitar sin indicar qué está pasando.
+- Mientras se ejecuta un delete/deactivate, reemplazar el texto del botón por `"…"` y `disabled={true}`.
+- Los errores del servidor deben mostrarse en texto legible, no como JSON ni stack trace. Siempre incluir fallback: `data?.error ?? "Error al guardar. Intentá de nuevo."`.
+- Después de una acción exitosa (create/edit/delete), hacer `refetch()` inmediatamente para que la tabla refleje el cambio sin recargar la página.
+
+**Formularios**
+- Usar `InlineForm` — el formulario aparece en la misma página, no navega a otra pantalla. El usuario nunca pierde el contexto.
+- El botón "Cancelar" siempre limpia el formulario y el error: `setForm(EMPTY_FORM); setFormError(null); setShowForm(false)`.
+- Validar en el cliente antes de hacer fetch. Si falta un campo requerido, mostrar el error sin llamar al servidor.
+- En inline editing, el formulario reemplaza la fila en la tabla para que el usuario vea exactamente qué está editando.
+
+**Acciones destructivas**
+- "Dar de baja", "Desactivar", "Eliminar", "Desinscribir", "Remover" usan `variant="danger"` (rojo).
+- Toda acción destructiva debe pedir confirmación con el componente `<ConfirmDialog>` (nunca `window.confirm()` ni `alert()` — el diálogo del navegador queda muy mal). Patrón:
+  ```tsx
+  import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  // Botón:
+  <Button variant="danger" onClick={() => setConfirmId(item.id)}>Eliminar</Button>
+  // Al final del return:
+  <ConfirmDialog
+    open={confirmId !== null}
+    title="Eliminar elemento"
+    message="¿Estás seguro? Esta acción no se puede deshacer."
+    confirmLabel="Eliminar"
+    onConfirm={() => { const id = confirmId!; setConfirmId(null); handleDelete(id) }}
+    onCancel={() => setConfirmId(null)}
+  />
+  ```
+- Para acciones reversibles (soft-delete, desinscribir) el mensaje debe aclararlo: "Podrás volver a inscribirlo cuando quieras."
+- Nunca mostrar un botón destructivo sin que el usuario entienda qué va a pasar.
+
+**Estados de la tabla**
+- Estado loading: mostrar "Cargando…" centrado en la tabla, nunca dejar la pantalla en blanco.
+- Estado error: mostrar el mensaje en rojo, no ocultar el componente.
+- Estado vacío sin búsqueda: mensaje explicativo + hint de cómo crear el primer registro.
+- Estado vacío con búsqueda activa: "Sin resultados para esa búsqueda." — nunca mezclar con el estado vacío real.
+
+**Responsive**
+- Usar `sm:grid-cols-N` en formularios para que en mobile los campos sean de 1 columna.
+- La tabla tiene scroll horizontal (`overflow-x-auto` + `minWidth`), nunca truncar datos.
+- El botón principal de acción (`PageHeader action`) en mobile debe estar debajo del título (`self-start`).
+
+---
+
 ## Step 1 — Read context
 
 - `app/api/$ARGUMENTS/route.ts` — GET/POST endpoints available and query params required
