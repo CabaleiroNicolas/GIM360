@@ -99,7 +99,7 @@ export default function PaymentsView({ gymId }: { gymId: string }) {
             type="month"
             value={period}
             max={maxPeriod}
-            onChange={(e) => setPeriod(e.target.value)}
+            onChange={(e) => setPeriod(e.target.value > maxPeriod ? maxPeriod : e.target.value)}
           />
         }
       />
