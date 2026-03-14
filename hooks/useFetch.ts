@@ -4,6 +4,7 @@ export function useFetch<T>(
   url: string | null,
   initialData: T,
   errorMsg: string,
+  
 ): {
   data: T
   loading: boolean
