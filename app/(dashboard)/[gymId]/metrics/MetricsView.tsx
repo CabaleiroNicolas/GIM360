@@ -114,7 +114,7 @@ export default function MetricsView({ gymId }: { gymId: string }) {
         </div>
         <div className="flex items-center gap-2">
           <Label htmlFor="period">Período</Label>
-          <Input id="period" type="month" value={period} max={maxPeriod} onChange={(e) => setPeriod(e.target.value)} className="py-2" />
+          <Input id="period" type="month" value={period} max={maxPeriod} onChange={(e) => setPeriod(e.target.value > maxPeriod ? maxPeriod : e.target.value)} className="py-2" />
         </div>
       </div>
 
