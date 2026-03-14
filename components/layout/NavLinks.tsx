@@ -16,6 +16,7 @@ export function NavLinks({ gymId }: { gymId: string }) {
     { label: "Cuotas",       href: `/${gymId}/payments` },
     { label: "Gastos",       href: `/${gymId}/expenses` },
     { label: "Métricas",     href: `/${gymId}/metrics` },
+    { label: "IvoPuto",     href: `/${gymId}/metrics` },
   ]
 
   // Cerrar al hacer click fuera
