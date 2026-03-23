@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { UserRole } from "@/app/generated/prisma/client"
 import { withAuthParams } from "@/lib/with-auth"
 import { gymBelongsToOwner, groupBelongsToGym, trainerBelongsToGroup } from "@/modules/belongs/belongs.service"
 import { removeTrainer, updateTrainerAssignment, getGroupById } from "@/modules/groups/groups.service"
 import { updateTrainerAssignmentSchema } from "@/modules/groups/groups.schema"
+import { getTrainerScheduleConflicts } from "@/modules/trainers/trainers.service"
 import { db } from "@/lib/db"
 
 type Params = { id: string; trainerId: string }
@@ -27,6 +28,7 @@ export const PATCH = withAuthParams<Params>([UserRole.OWNER], async (req, sessio
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const body = await req.json()
+  const forceOverlap = body.forceOverlap === true
   const parsed = updateTrainerAssignmentSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
@@ -50,6 +52,22 @@ export const PATCH = withAuthParams<Params>([UserRole.OWNER], async (req, sessio
         { error: `El horario ${entry.startTime}-${entry.endTime} excede el horario del grupo para el ${DAY_ES[entry.weekDay] ?? entry.weekDay}` },
         { status: 400 }
       )
+    }
+  }
+
+  // Check for schedule overlaps with other groups (warn, not block)
+  if (!forceOverlap) {
+    const conflicts = await getTrainerScheduleConflicts(trainerId, parsed.data.schedules, groupId)
+    if (conflicts.length > 0) {
+      return NextResponse.json({
+        error: "El profesor tiene horarios superpuestos con otros grupos",
+        conflicts: conflicts.map((c) => ({
+          weekDay: DAY_ES[c.weekDay] ?? c.weekDay,
+          newTime: c.newTime,
+          existingTime: c.existingTime,
+          groupName: c.groupName,
+        })),
+      }, { status: 409 })
     }
   }
 

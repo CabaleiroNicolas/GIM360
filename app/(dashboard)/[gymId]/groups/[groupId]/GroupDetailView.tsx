@@ -1049,6 +1049,10 @@ function TrainerAssignForm({
   )
 }
 
+type ScheduleConflict = {
+  weekDay: string; newTime: string; existingTime: string; groupName: string
+}
+
 function TrainersTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
   const [gymTrainers, setGymTrainers] = useState<GymTrainer[]>([])
   const [loadingPicker, setLoadingPicker] = useState(false)
@@ -1062,6 +1066,10 @@ function TrainersTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
   const [editingTrainer, setEditingTrainer] = useState<AssignedTrainer | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+
+  // Overlap conflict state
+  const [overlapConflicts, setOverlapConflicts] = useState<ScheduleConflict[]>([])
+  const [pendingOverlapAction, setPendingOverlapAction] = useState<"assign" | "edit" | null>(null)
 
   // Track current form state from TrainerAssignForm children
   const [assignFormCurrent, setAssignFormCurrent] = useState<TrainerFormState>(buildEmptyTrainerForm())
@@ -1119,7 +1127,7 @@ function TrainersTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
     return null
   }
 
-  async function handleAssign(e: React.FormEvent) {
+  async function handleAssign(e: React.FormEvent, forceOverlap = false) {
     e.preventDefault()
     setAssignError(null)
     const err = validateForm(assignFormCurrent, true)
@@ -1131,17 +1139,26 @@ function TrainersTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
         trainerId: assignFormCurrent.trainerId,
         hourlyRate: Number(assignFormCurrent.hourlyRate),
         schedules: buildSchedulesPayload(assignFormCurrent.days),
+        ...(forceOverlap && { forceOverlap: true }),
       }
       const res = await fetch(`/api/groups/${groupId}/trainers?gymId=${gymId}`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       })
-      if (res.ok) { setShowForm(false); await onRefresh() }
-      else { const d = await res.json().catch(() => ({})); setAssignError(d?.error ?? "Error al asignar el entrenador.") }
+      if (res.ok) { setShowForm(false); setOverlapConflicts([]); setPendingOverlapAction(null); await onRefresh() }
+      else {
+        const d = await res.json().catch(() => ({}))
+        if (res.status === 409 && d.conflicts) {
+          setOverlapConflicts(d.conflicts)
+          setPendingOverlapAction("assign")
+        } else {
+          setAssignError(d?.error ?? "Error al asignar el entrenador.")
+        }
+      }
     } catch { setAssignError("Error de red.") }
     finally { setAssigning(false) }
   }
 
-  async function handleEdit(e: React.FormEvent) {
+  async function handleEdit(e: React.FormEvent, forceOverlap = false) {
     e.preventDefault()
     if (!editingTrainer) return
     setEditError(null)
@@ -1153,14 +1170,34 @@ function TrainersTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
       const body = {
         hourlyRate: Number(editFormCurrent.hourlyRate),
         schedules: buildSchedulesPayload(editFormCurrent.days),
+        ...(forceOverlap && { forceOverlap: true }),
       }
       const res = await fetch(`/api/groups/${groupId}/trainers/${editingTrainer.trainer.id}?gymId=${gymId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       })
-      if (res.ok) { setShowEditModal(false); setEditingTrainer(null); await onRefresh() }
-      else { const d = await res.json().catch(() => ({})); setEditError(d?.error ?? "Error al actualizar el entrenador.") }
+      if (res.ok) { setShowEditModal(false); setEditingTrainer(null); setOverlapConflicts([]); setPendingOverlapAction(null); await onRefresh() }
+      else {
+        const d = await res.json().catch(() => ({}))
+        if (res.status === 409 && d.conflicts) {
+          setOverlapConflicts(d.conflicts)
+          setPendingOverlapAction("edit")
+        } else {
+          setEditError(d?.error ?? "Error al actualizar el entrenador.")
+        }
+      }
     } catch { setEditError("Error de red.") }
     finally { setAssigning(false) }
+  }
+
+  function handleForceOverlap() {
+    const fakeEvent = { preventDefault: () => {} } as React.FormEvent
+    if (pendingOverlapAction === "assign") handleAssign(fakeEvent, true)
+    else if (pendingOverlapAction === "edit") handleEdit(fakeEvent, true)
+  }
+
+  function dismissOverlap() {
+    setOverlapConflicts([])
+    setPendingOverlapAction(null)
   }
 
   async function handleRemove(trainerId: string) {
@@ -1228,6 +1265,53 @@ function TrainersTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
           />
         )}
       </FormModal>
+
+      {/* Overlap conflict dialog */}
+      {overlapConflicts.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-[#111110]">Horarios superpuestos</h3>
+                <p className="mt-1 text-xs text-[#68685F]">El profesor ya tiene horarios asignados que se superponen con los nuevos:</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {overlapConflicts.map((c, i) => (
+                <div key={i} className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs">
+                  <p className="font-semibold text-amber-800">{c.weekDay}</p>
+                  <p className="text-amber-700">
+                    Nuevo: <span className="font-mono">{c.newTime}</span>
+                    {" — "}
+                    Existente: <span className="font-mono">{c.existingTime}</span> en <span className="font-semibold">{c.groupName}</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 justify-end pt-1">
+              <button
+                onClick={dismissOverlap}
+                className="cursor-pointer rounded-lg border border-[#E5E4E0] px-4 py-2 text-sm text-[#68685F] hover:bg-[#F7F6F3] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleForceOverlap}
+                disabled={assigning}
+                className="cursor-pointer rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 transition-colors disabled:opacity-50"
+              >
+                {assigning ? "Asignando..." : "Asignar de todas formas"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Assigned trainers table */}
       <div className="overflow-x-auto rounded-xl border border-[#E5E4E0] bg-white">

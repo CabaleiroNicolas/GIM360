@@ -35,39 +35,232 @@ function pct(n: number) { return `${Math.round(n * 100)}%` }
 
 // ─── Metric Card ─────────────────────────────────────────────────────────────
 
-function MetricStatCard({ label, value, tooltip, highlight }: {
-  label: string; value: string; tooltip?: string; highlight?: "positive" | "negative" | "neutral"
-}) {
-  const accentColor = highlight === "positive" ? "#10b981" : highlight === "negative" ? "#ef4444" : "#E5E4E0"
-  const valueColor = highlight === "positive" ? "text-emerald-700" : highlight === "negative" ? "text-red-700" : "text-[#111110]"
-
+function MiniBar({ percentage, color }: { percentage: number; color: string }) {
+  const clamped = Math.min(Math.max(Math.round(percentage), 0), 100)
   return (
-    <div className="relative rounded-xl border border-[#E5E4E0] bg-white px-5 py-4 overflow-hidden flex flex-col">
-      <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-xl" style={{ backgroundColor: accentColor }} />
-      <p className="min-h-[2rem] text-[10px] font-semibold uppercase tracking-[0.12em] text-[#A5A49D] flex items-start justify-between">
-        <span>{label}</span>
-        {tooltip && <InfoTooltip text={tooltip} />}
-      </p>
-      <p className={`mt-auto text-2xl font-bold font-mono ${valueColor}`}>{value}</p>
+    <div className="mt-3">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-[#F0EFEB]">
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${clamped}%`, backgroundColor: color }} />
+      </div>
     </div>
   )
 }
 
-function CollectionProgress({ collected, total }: { collected: number; total: number }) {
-  if (total === 0) return null
-  const pctVal = Math.round((collected / total) * 100)
+function MetricCard({ label, value, context, percentage, barColor, size = "normal", tooltip, showBar = true, showPercentage = true }: {
+  label: string; value: string; context: string; percentage: number; barColor: string
+  size?: "normal" | "hero"; tooltip?: string; showBar?: boolean; showPercentage?: boolean
+}) {
+  const displayPct = Math.round(percentage)
   return (
-    <div className="rounded-xl border border-[#E5E4E0] bg-white px-5 py-4">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm text-[#68685F]">
-          <span className="font-semibold text-[#111110]">{fmt(collected)}</span>
-          {" cobrados de "}
-          <span className="text-[#A5A49D]">{fmt(total)}</span>
-        </span>
-        <span className="text-sm font-bold font-mono text-[#111110]">{pctVal}%</span>
+    <div className={`rounded-xl border border-[#E5E4E0] bg-white overflow-hidden flex flex-col ${size === "hero" ? "px-6 py-5" : "px-5 py-4"}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#A5A49D] flex items-center gap-1">
+        {label}
+        {tooltip && <InfoTooltip text={tooltip} />}
+      </p>
+      <div className="flex items-baseline gap-3 mt-1.5">
+        <p className={`font-bold font-mono ${size === "hero" ? "text-3xl" : "text-2xl"}`} style={{ color: barColor }}>
+          {value}
+        </p>
+        {showPercentage && (
+          <span className={`font-bold font-mono ${size === "hero" ? "text-xl" : "text-lg"} opacity-80`} style={{ color: barColor }}>
+            {displayPct}%
+          </span>
+        )}
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#F0EFEB]">
-        <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${pctVal}%` }} />
+      {showBar && <MiniBar percentage={percentage} color={barColor} />}
+      <p className="mt-1.5 text-xs text-[#68685F]">{context}</p>
+    </div>
+  )
+}
+
+// ─── Stacked Bar ─────────────────────────────────────────────────────────────
+
+function StackedBar({ segments }: { segments: { label: string; value: string; pct: number; color: string }[] }) {
+  return (
+    <div className="rounded-xl border border-[#E5E4E0] bg-white px-5 py-4 space-y-3">
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-[#F0EFEB]">
+        {segments.map((s, i) => (
+          <div key={i} className="h-full transition-all duration-500" style={{ width: `${s.pct}%`, backgroundColor: s.color }} />
+        ))}
+      </div>
+      <div className="flex justify-between text-xs">
+        {segments.map((s, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
+            <span className="text-[#68685F]">{s.label}</span>
+            <span className="font-mono font-semibold text-[#111110]">{s.value}</span>
+            <span className="text-[#A5A49D]">({Math.round(s.pct)}%)</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Group Detail View ────────────────────────────────────────────────────────
+
+function GroupDetailView({ group: g, onBack }: { group: GroupMetrics; onBack: () => void }) {
+  const collectionPct = g.projectedRevenue > 0 ? (g.collectedRevenue / g.projectedRevenue) * 100 : 0
+  const uncollected = g.projectedRevenue - g.collectedRevenue
+  const uncollectedPct = 100 - collectionPct
+  const costRevenuePct = g.collectedRevenue > 0 ? (g.trainerCost / g.collectedRevenue) * 100 : 0
+  const marginPct = g.collectedRevenue > 0 ? (g.margin / g.collectedRevenue) * 100 : 0
+  const marginColor = g.margin >= 0 ? "#10b981" : "#ef4444"
+  const occupancyPct = g.occupancyRate != null ? g.occupancyRate * 100 : null
+  const occupancyColor = occupancyPct != null ? (occupancyPct >= 80 ? "#10b981" : occupancyPct >= 50 ? "#f59e0b" : "#ef4444") : "#A5A49D"
+  const spotsRemaining = g.maxCapacity != null ? g.maxCapacity - g.activeStudents : null
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div>
+        <button
+          onClick={onBack}
+          className="cursor-pointer flex items-center gap-1.5 text-sm text-[#A5A49D] hover:text-[#111110] transition-colors mb-1"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 2 4 8l6 6" />
+          </svg>
+          Volver a grupos
+        </button>
+        <h2 className="text-xl font-semibold text-[#111110]">{g.groupName}</h2>
+      </div>
+
+      {/* Section A — Hero: Margen del grupo */}
+      <MetricCard
+        size="hero"
+        label="Margen del grupo"
+        value={fmt(g.margin)}
+        percentage={marginPct}
+        barColor={marginColor}
+        showBar={false}
+        context={g.margin >= 0 ? "margen sobre lo cobrado" : "pérdida sobre lo cobrado"}
+        tooltip={`Ingreso cobrado menos costo de profesores.\nNo incluye gastos fijos del gimnasio.\n\nCálculo:\n${fmt(g.collectedRevenue)} (cobrado)\n− ${fmt(g.trainerCost)} (profesores)\n= ${fmt(g.margin)}`}
+      />
+
+      {/* Section B — Ingresos */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <MetricCard
+          label="Cobrado"
+          value={fmt(g.collectedRevenue)}
+          percentage={collectionPct}
+          barColor="#10b981"
+          context={`${Math.round(collectionPct)}% del ingreso proyectado (${fmt(g.projectedRevenue)})`}
+        />
+        <MetricCard
+          label="Pendiente"
+          value={fmt(uncollected)}
+          percentage={uncollectedPct}
+          barColor="#f59e0b"
+          context={`${Math.round(uncollectedPct)}% del ingreso proyectado sin cobrar`}
+        />
+      </div>
+
+      {/* Section C — Desglose de ingresos */}
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#A5A49D] mb-2">Desglose de ingresos</p>
+        <StackedBar segments={[
+          { label: "Cobrado", value: fmt(g.collectedRevenue), pct: collectionPct, color: "#10b981" },
+          { label: "Pendiente", value: fmt(uncollected), pct: uncollectedPct, color: "#f59e0b" },
+        ]} />
+      </div>
+
+      {/* Section D — Costos y equilibrio */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <MetricCard
+          label="Costo profesores"
+          value={fmt(g.trainerCost)}
+          percentage={costRevenuePct}
+          barColor="#ef4444"
+          context={`${Math.round(costRevenuePct)}% de lo cobrado se destina a profesores`}
+          tooltip={`Tarifa/hora × horas semanales × 4,33 semanas/mes.\n\nHoras/mes del grupo: ${g.monthlyHours.toFixed(1)}h\n\nCálculo:\n${fmt(g.trainerCost)} profesores / ${fmt(g.collectedRevenue)} cobrado = ${Math.round(costRevenuePct)}%`}
+        />
+        <MetricCard
+          label="Punto de equilibrio"
+          value={g.breakevenStudents != null ? `${g.breakevenStudents} alumnos` : "—"}
+          percentage={
+            g.breakevenStudents != null && g.activeStudents > 0
+              ? Math.min((g.activeStudents / g.breakevenStudents) * 100, 100)
+              : 0
+          }
+          barColor={marginColor}
+          context={
+            g.margin >= 0
+              ? `Superado — ${g.activeStudents} alumnos activos cubren los costos`
+              : `Faltan ${(g.breakevenStudents ?? 0) - g.activeStudents} alumnos para cubrir costos`
+          }
+          tooltip={`Mínimo de alumnos necesarios para cubrir el costo de profesores.\n\nCálculo:\n${fmt(g.trainerCost)} costo / ${fmt(g.monthlyPrice)} precio = ${g.breakevenStudents} alumnos`}
+        />
+      </div>
+
+      {/* Section E — Estructura de costos */}
+      {g.collectedRevenue > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#A5A49D] mb-2">Estructura de costos sobre lo cobrado</p>
+          <StackedBar segments={
+            g.margin >= 0
+              ? [
+                  { label: "Profesores", value: fmt(g.trainerCost), pct: costRevenuePct, color: "#ef4444" },
+                  { label: "Margen", value: fmt(g.margin), pct: marginPct, color: "#10b981" },
+                ]
+              : [
+                  { label: "Profesores", value: fmt(g.trainerCost), pct: 100, color: "#ef4444" },
+                ]
+          } />
+        </div>
+      )}
+
+      {/* Section F — Ocupación e info */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <MetricCard
+          label="Ocupación"
+          value={g.maxCapacity != null ? `${g.activeStudents} / ${g.maxCapacity}` : `${g.activeStudents}`}
+          percentage={occupancyPct ?? 0}
+          barColor={occupancyColor}
+          showBar={g.maxCapacity != null}
+          context={
+            g.maxCapacity != null
+              ? (spotsRemaining! > 0 ? `${spotsRemaining} lugares disponibles` : "Grupo completo")
+              : "Sin capacidad máxima configurada"
+          }
+          tooltip={
+            g.maxCapacity != null
+              ? `Porcentaje de alumnos activos respecto a la capacidad máxima.\n\nCálculo:\n${g.activeStudents} alumnos / ${g.maxCapacity} capacidad = ${Math.round(occupancyPct!)}%`
+              : `${g.activeStudents} alumnos activos en el grupo.`
+          }
+        />
+        <MetricCard
+          label="Precio mensual"
+          value={fmt(g.monthlyPrice)}
+          percentage={0}
+          barColor="#111110"
+          showPercentage={false}
+          showBar={false}
+          context="Por alumno inscripto"
+        />
+      </div>
+
+      {/* Section G — Info adicional */}
+      <div className="rounded-xl border border-[#E5E4E0] bg-[#FAFAF9] px-5 py-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#A5A49D] mb-3">Información adicional</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+          <div>
+            <p className="text-[#A5A49D] text-xs">Horas/mes</p>
+            <p className="font-mono font-semibold text-[#111110]">{g.monthlyHours.toFixed(1)}h</p>
+          </div>
+          <div>
+            <p className="text-[#A5A49D] text-xs">Precio/mes</p>
+            <p className="font-mono font-semibold text-[#111110]">{fmt(g.monthlyPrice)}</p>
+          </div>
+          <div>
+            <p className="text-[#A5A49D] text-xs">Ing. proyectado</p>
+            <p className="font-mono font-semibold text-[#111110]">{fmt(g.projectedRevenue)}</p>
+          </div>
+          <div>
+            <p className="text-[#A5A49D] text-xs">Alumnos activos</p>
+            <p className="font-mono font-semibold text-[#111110]">{g.activeStudents}</p>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -88,6 +281,7 @@ export default function MetricsView({ gymId }: { gymId: string }) {
   const [activeView, setActiveView] = useState<MetricView>("gimnasio")
   const [gymMetrics, setGymMetrics] = useState<GymMetrics | null>(null)
   const [groupMetrics, setGroupMetrics] = useState<GroupMetrics[]>([])
+  const [selectedGroup, setSelectedGroup] = useState<GroupMetrics | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -107,11 +301,17 @@ export default function MetricsView({ gymId }: { gymId: string }) {
 
   useEffect(() => { fetchMetrics() }, [fetchMetrics])
 
-  const ebitdaHighlight = gymMetrics === null ? "neutral" : gymMetrics.ebitda >= 0 ? "positive" : "negative"
+  useEffect(() => { setSelectedGroup(null) }, [period])
+
   const totalRevenue = gymMetrics ? gymMetrics.totalCollectedRevenue + gymMetrics.totalPendingRevenue : 0
-  const ebitdaMarginPct = gymMetrics && gymMetrics.totalCollectedRevenue > 0
-    ? Math.round((gymMetrics.ebitda / gymMetrics.totalCollectedRevenue) * 100)
-    : null
+  const totalCosts = gymMetrics ? gymMetrics.totalTrainerCost + gymMetrics.totalFixedExpenses : 0
+  const collectedPct = totalRevenue > 0 ? (gymMetrics?.totalCollectedRevenue ?? 0) / totalRevenue * 100 : 0
+  const pendingPct = totalRevenue > 0 ? (gymMetrics?.totalPendingRevenue ?? 0) / totalRevenue * 100 : 0
+  const trainerCostPct = gymMetrics && gymMetrics.totalCollectedRevenue > 0 ? gymMetrics.totalTrainerCost / gymMetrics.totalCollectedRevenue * 100 : 0
+  const fixedExpPct = gymMetrics && gymMetrics.totalCollectedRevenue > 0 ? gymMetrics.totalFixedExpenses / gymMetrics.totalCollectedRevenue * 100 : 0
+  const totalCostPct = gymMetrics && gymMetrics.totalCollectedRevenue > 0 ? totalCosts / gymMetrics.totalCollectedRevenue * 100 : 0
+  const ebitdaPct = gymMetrics && gymMetrics.totalCollectedRevenue > 0 ? (gymMetrics.ebitda / gymMetrics.totalCollectedRevenue) * 100 : 0
+  const ebitdaColor = gymMetrics && gymMetrics.ebitda >= 0 ? "#10b981" : "#ef4444"
   const totalGroupMargin = groupMetrics.reduce((s, g) => s + g.margin, 0)
 
   return (
@@ -135,7 +335,7 @@ export default function MetricsView({ gymId }: { gymId: string }) {
       {/* View selector */}
       <div className="flex items-center gap-1 border-b border-[#E5E4E0]">
         {VIEWS.map(({ id, label }) => (
-          <button key={id} onClick={() => setActiveView(id)}
+          <button key={id} onClick={() => { setActiveView(id); setSelectedGroup(null) }}
             className={`cursor-pointer px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
               activeView === id ? "border-[#111110] text-[#111110]" : "border-transparent text-[#A5A49D] hover:text-[#68685F]"
             }`}
@@ -151,39 +351,87 @@ export default function MetricsView({ gymId }: { gymId: string }) {
         <>
           {/* ── GIMNASIO ── */}
           {activeView === "gimnasio" && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                <MetricStatCard label="Ingresos cobrados" value={fmt(gymMetrics.totalCollectedRevenue)} tooltip="Suma de todos los pagos en estado PAGADO para el período seleccionado." highlight="positive" />
-                <MetricStatCard label="Ingresos pendientes" value={fmt(gymMetrics.totalPendingRevenue)} tooltip="Suma de todos los pagos en estado PENDIENTE para el período seleccionado." />
-                <MetricStatCard label="Costo entrenadores" value={fmt(gymMetrics.totalTrainerCost)} tooltip="Costo total de entrenadores: tarifa por hora × horas semanales × 4,33 semanas/mes, para cada entrenador activo." highlight="negative" />
-                <MetricStatCard label="Gastos fijos" value={fmt(gymMetrics.totalFixedExpenses)} tooltip="Suma de todos los gastos fijos configurados: alquiler, servicios, seguros, etc." highlight="negative" />
-                <MetricStatCard label="EBITDA" value={fmt(gymMetrics.ebitda)} tooltip="Resultado operativo: ingresos cobrados menos costo de entrenadores y gastos fijos." highlight={ebitdaHighlight} />
-                <MetricStatCard label="Margen EBITDA" value={ebitdaMarginPct !== null ? `${ebitdaMarginPct}%` : "—"} tooltip="Porcentaje de ganancia (o pérdida) sobre los ingresos cobrados. Indica qué proporción del ingreso queda como resultado operativo." highlight={ebitdaHighlight} />
+            <div className="space-y-5">
+              {/* Hero: Ganancia del mes */}
+              <MetricCard
+                size="hero"
+                label="Ganancia del mes"
+                value={fmt(gymMetrics.ebitda)}
+                percentage={ebitdaPct}
+                barColor={ebitdaColor}
+                showBar={false}
+                context={gymMetrics.ebitda >= 0 ? "margen sobre lo cobrado" : "pérdida sobre lo cobrado"}
+                tooltip={`Lo que queda después de pagar profesores y gastos fijos.\n\nCálculo:\n${fmt(gymMetrics.totalCollectedRevenue)} (cobrado)\n− ${fmt(gymMetrics.totalTrainerCost)} (profesores)\n− ${fmt(gymMetrics.totalFixedExpenses)} (gastos fijos)\n= ${fmt(gymMetrics.ebitda)}`}
+              />
+
+              {/* Ingresos: Cobrado + Pendiente */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <MetricCard
+                  label="Cobrado"
+                  value={fmt(gymMetrics.totalCollectedRevenue)}
+                  percentage={collectedPct}
+                  barColor="#10b981"
+                  context={`${Math.round(collectedPct)}% del total esperado (${fmt(totalRevenue)})`}
+                  tooltip={`Suma de todas las cuotas pagadas en este período.\n\nCálculo:\n${fmt(gymMetrics.totalCollectedRevenue)} cobrado / ${fmt(totalRevenue)} total = ${Math.round(collectedPct)}%`}
+                />
+                <MetricCard
+                  label="Pendiente de cobro"
+                  value={fmt(gymMetrics.totalPendingRevenue)}
+                  percentage={pendingPct}
+                  barColor="#f59e0b"
+                  context={`${Math.round(pendingPct)}% del total esperado sin cobrar`}
+                  tooltip={`Cuotas pendientes y vencidas que aún no fueron cobradas.\n\nCálculo:\n${fmt(gymMetrics.totalPendingRevenue)} pendiente / ${fmt(totalRevenue)} total = ${Math.round(pendingPct)}%`}
+                />
               </div>
-              {totalRevenue > 0 && <CollectionProgress collected={gymMetrics.totalCollectedRevenue} total={totalRevenue} />}
+
+              {/* Costos del mes */}
+              <div className="rounded-xl border border-[#E5E4E0] bg-[#FAFAF9] p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#A5A49D]">Costos del mes</p>
+                  <p className="text-sm font-semibold font-mono text-red-700">{fmt(totalCosts)}<span className="ml-1.5 text-xs font-normal text-[#A5A49D]">({Math.round(totalCostPct)}% de lo cobrado)</span></p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <MetricCard
+                    label="Profesores"
+                    value={fmt(gymMetrics.totalTrainerCost)}
+                    percentage={trainerCostPct}
+                    barColor="#ef4444"
+                    context={`${Math.round(trainerCostPct)}% de lo cobrado se destina a profesores`}
+                    tooltip={`Costo total de profesores: tarifa/hora × horas semanales × 4,33 semanas/mes.\n\nCálculo:\n${fmt(gymMetrics.totalTrainerCost)} profesores / ${fmt(gymMetrics.totalCollectedRevenue)} cobrado = ${Math.round(trainerCostPct)}%`}
+                  />
+                  <MetricCard
+                    label="Gastos fijos"
+                    value={fmt(gymMetrics.totalFixedExpenses)}
+                    percentage={fixedExpPct}
+                    barColor="#ef4444"
+                    context={`${Math.round(fixedExpPct)}% de lo cobrado se va en gastos fijos`}
+                    tooltip={`Alquiler, servicios, seguros y otros gastos fijos configurados.\n\nCálculo:\n${fmt(gymMetrics.totalFixedExpenses)} gastos fijos / ${fmt(gymMetrics.totalCollectedRevenue)} cobrado = ${Math.round(fixedExpPct)}%`}
+                  />
+                </div>
+              </div>
             </div>
           )}
 
           {/* ── GRUPOS ── */}
           {activeView === "grupos" && (
             <div>
-              {groupMetrics.length === 0 ? (
+              {selectedGroup ? (
+                <GroupDetailView group={selectedGroup} onBack={() => setSelectedGroup(null)} />
+              ) : groupMetrics.length === 0 ? (
                 <p className="text-sm text-[#A5A49D]">No hay grupos en este gimnasio.</p>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-[#E5E4E0] bg-white">
-                  <table className="w-full min-w-[720px] text-sm">
+                  <table className="w-full min-w-[640px] text-sm">
                     <thead>
                       <tr className="border-b border-[#F0EFEB]">
                         {[
                           { label: "Grupo", align: "left", tooltip: null },
                           { label: "Alumnos", align: "right", tooltip: "Alumnos activos en el grupo. Si hay capacidad máxima configurada, se muestra el total." },
                           { label: "Ocupación", align: "right", tooltip: "Porcentaje de ocupación respecto a la capacidad máxima del grupo." },
-                          { label: "Precio/mes", align: "right", tooltip: "Precio mensual que paga cada alumno inscripto en este grupo." },
                           { label: "Ing. proyectado", align: "right", tooltip: "Ingreso esperado si todos los alumnos activos pagaran: alumnos × precio/mes." },
                           { label: "Ing. cobrado", align: "right", tooltip: "Suma real de pagos PAGADOS en el período para este grupo." },
-                          { label: "Hs/mes", align: "right", tooltip: "Horas de clase estimadas por mes, basadas en los horarios del grupo (× 4,33 semanas)." },
                           { label: "Costo prof.", align: "right", tooltip: "Costo total de los profesores: tarifa/hora × horas semanales × 4,33 semanas/mes." },
-                          { label: "Punto equilibrio", align: "right", tooltip: "Mínimo de alumnos que deben pagar para cubrir el costo de los profesores. Verde si el ingreso cobrado lo supera." },
+                          { label: "Punto equilibrio", align: "right", tooltip: "Mínimo de alumnos que deben pagar para cubrir el costo de los profesores." },
                           { label: "Margen", align: "right", tooltip: "Ingreso cobrado menos costo de profesores. No incluye gastos fijos." },
                         ].map(({ label, align, tooltip }) => (
                           <th key={label} className={`px-4 py-3.5 text-${align} text-[10px] font-semibold uppercase tracking-[0.12em] text-[#A5A49D]`}>
@@ -199,7 +447,11 @@ export default function MetricsView({ gymId }: { gymId: string }) {
                     </thead>
                     <tbody>
                       {groupMetrics.map((g, i) => (
-                        <tr key={g.groupId} className={`hover:bg-[#FAFAF9] transition-colors ${i > 0 ? "border-t border-[#F7F6F3]" : ""}`}>
+                        <tr
+                          key={g.groupId}
+                          className={`cursor-pointer hover:bg-[#FAFAF9] transition-colors ${i > 0 ? "border-t border-[#F7F6F3]" : ""}`}
+                          onClick={() => setSelectedGroup(g)}
+                        >
                           <td className="px-4 py-4 font-medium text-[#111110]">{g.groupName}</td>
                           <td className="px-4 py-4 text-right text-[#68685F]">
                             {g.activeStudents}{g.maxCapacity != null && <span className="text-[#A5A49D]"> / {g.maxCapacity}</span>}
@@ -209,16 +461,14 @@ export default function MetricsView({ gymId }: { gymId: string }) {
                               <span className={`font-mono font-medium ${g.occupancyRate >= 0.8 ? "text-emerald-700" : g.occupancyRate >= 0.5 ? "text-amber-700" : "text-red-700"}`}>{pct(g.occupancyRate)}</span>
                             ) : <span className="text-[#A5A49D]">—</span>}
                           </td>
-                          <td className="px-4 py-4 text-right font-mono text-[#68685F]">{fmt(g.monthlyPrice)}</td>
                           <td className="px-4 py-4 text-right font-mono text-[#68685F]">{fmt(g.projectedRevenue)}</td>
                           <td className="px-4 py-4 text-right font-mono font-semibold text-[#111110]">{fmt(g.collectedRevenue)}</td>
-                          <td className="px-4 py-4 text-right text-[#A5A49D]">{g.monthlyHours.toFixed(1)}h</td>
-                          <td className="px-4 py-4 text-right font-mono text-red-700">{fmt(g.trainerCost)}</td>
+                          <td className="px-4 py-4 text-right font-mono text-[#68685F]">{fmt(g.trainerCost)}</td>
                           <td className="px-4 py-4 text-right">
                             {g.breakevenStudents === null ? (
                               <span className="text-[#A5A49D]">—</span>
                             ) : (
-                              <span className={`font-mono font-medium ${g.margin >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                              <span className="font-mono font-medium text-[#68685F]">
                                 {g.breakevenStudents} alumnos
                               </span>
                             )}
@@ -229,11 +479,10 @@ export default function MetricsView({ gymId }: { gymId: string }) {
                     </tbody>
                     <tfoot>
                       <tr className="border-t-2 border-[#E5E4E0] bg-[#F7F6F3]">
-                        <td className="px-4 py-3.5 font-semibold text-[#68685F]" colSpan={4}>Total</td>
+                        <td className="px-4 py-3.5 font-semibold text-[#68685F]" colSpan={3}>Total</td>
                         <td className="px-4 py-3.5 text-right font-mono font-semibold text-[#68685F]">{fmt(groupMetrics.reduce((s, g) => s + g.projectedRevenue, 0))}</td>
                         <td className="px-4 py-3.5 text-right font-mono font-semibold text-[#111110]">{fmt(groupMetrics.reduce((s, g) => s + g.collectedRevenue, 0))}</td>
-                        <td className="px-4 py-3.5 text-right text-[#A5A49D]">—</td>
-                        <td className="px-4 py-3.5 text-right font-mono font-semibold text-red-700">{fmt(groupMetrics.reduce((s, g) => s + g.trainerCost, 0))}</td>
+                        <td className="px-4 py-3.5 text-right font-mono font-semibold text-[#68685F]">{fmt(groupMetrics.reduce((s, g) => s + g.trainerCost, 0))}</td>
                         <td className="px-4 py-3.5 text-right text-[#A5A49D]">—</td>
                         <td className={`px-4 py-3.5 text-right font-mono font-bold ${totalGroupMargin >= 0 ? "text-emerald-700" : "text-red-700"}`}>{fmt(totalGroupMargin)}</td>
                       </tr>

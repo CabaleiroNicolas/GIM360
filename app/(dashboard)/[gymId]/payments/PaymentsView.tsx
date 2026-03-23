@@ -183,7 +183,9 @@ export default function PaymentsView({ gymId }: { gymId: string }) {
   const expired = payments.filter((p) => p.status === "EXPIRED").length
   const collected = payments.filter((p) => p.status === "PAID").reduce((sum, p) => sum + Number(p.amount), 0)
   const pendingAmount = payments.filter((p) => p.status === "PENDING").reduce((sum, p) => sum + Number(p.amount), 0)
-  const total = collected + pendingAmount
+  const expiredAmount = payments.filter((p) => p.status === "EXPIRED").reduce((sum, p) => sum + Number(p.amount), 0)
+  const uncollectedAmount = pendingAmount + expiredAmount
+  const total = collected + uncollectedAmount
   const collectionPct = total > 0 ? Math.round((collected / total) * 100) : 0
 
   const unverifiedPaid = payments.filter((p) => !p.verified && p.status === "PAID")
@@ -296,10 +298,10 @@ export default function PaymentsView({ gymId }: { gymId: string }) {
       )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Total" value={payments.length} />
-        <StatCard label="Pagados" value={paid} valueColor="text-emerald-700" />
-        <StatCard label="Pendientes" value={pending} valueColor="text-amber-700" />
-        <StatCard label="Vencidos" value={expired} valueColor="text-red-700" />
+        <StatCard label="Total" value={payments.length} subtitle={`$${total.toLocaleString("es-AR")}`} />
+        <StatCard label="Pagados" value={paid} valueColor="text-emerald-700" subtitle={`$${collected.toLocaleString("es-AR")}`} />
+        <StatCard label="Pendientes" value={pending} valueColor="text-amber-700" subtitle={`$${pendingAmount.toLocaleString("es-AR")}`} />
+        <StatCard label="Vencidos" value={expired} valueColor="text-red-700" subtitle={`$${expiredAmount.toLocaleString("es-AR")}`} />
       </div>
 
       {payments.length > 0 && (

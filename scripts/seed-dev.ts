@@ -18,10 +18,12 @@ function date(year: number, month: number, day: number) {
   return new Date(Date.UTC(year, month - 1, day))
 }
 
+const PM = { E: "EFECTIVO", T: "TRANSFERENCIA", C: "TARJETA" } as const
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log("🌱 Seeding dev data...\n")
+  console.log("Seeding dev data...\n")
 
   // ── Owner + Gym ────────────────────────────────────────────────────────────
 
@@ -51,13 +53,15 @@ async function main() {
   })
 
   const gym = owner.owner!.gyms[0]
-  console.log(`✅ Owner: ${owner.email}  /  Gym: ${gym.name} (${gym.id})`)
+  console.log(`Owner: ${owner.email}  /  Gym: ${gym.name} (${gym.id})`)
 
   // ── Cleanup (idempotent re-runs) ───────────────────────────────────────────
 
   await db.payment.deleteMany({ where: { gymId: gym.id } })
   await db.cashClosing.deleteMany({ where: { gymId: gym.id } })
+  await db.studentFile.deleteMany({ where: { gymId: gym.id } })
   await db.studentGroup.deleteMany({ where: { student: { gymId: gym.id } } })
+  await db.trainerGroupSchedule.deleteMany({ where: { trainerGroup: { trainer: { gymId: gym.id } } } })
   await db.trainerGroup.deleteMany({ where: { trainer: { gymId: gym.id } } })
   await db.schedule.deleteMany({ where: { group: { gymId: gym.id } } })
   await db.student.deleteMany({ where: { gymId: gym.id } })
@@ -65,7 +69,7 @@ async function main() {
   await db.group.deleteMany({ where: { gymId: gym.id } })
   await db.fixedExpense.deleteMany({ where: { gymId: gym.id } })
 
-  console.log("🧹 Cleaned up existing gym data")
+  console.log("Cleaned up existing gym data")
 
   // ── Fixed Expenses ─────────────────────────────────────────────────────────
 
@@ -73,116 +77,85 @@ async function main() {
     data: [
       { gymId: gym.id, name: "Alquiler", amount: 120000 },
       { gymId: gym.id, name: "Servicios (luz, agua, gas)", amount: 25000 },
-      { gymId: gym.id, name: "Internet y telefonía", amount: 8000 },
+      { gymId: gym.id, name: "Internet y telefonia", amount: 8000 },
       { gymId: gym.id, name: "Limpieza y mantenimiento", amount: 15000 },
       { gymId: gym.id, name: "Seguro", amount: 12000 },
     ],
   })
 
-  console.log("✅ Fixed expenses: Alquiler, Servicios, Internet, Limpieza, Seguro ($180.000 total)")
+  console.log("Fixed expenses: $180.000/mes")
 
   // ── Groups ─────────────────────────────────────────────────────────────────
 
-  const [groupBeginners, groupIntermediate, groupAdvanced, groupCompetition, groupBaby] = await Promise.all([
+  const [gPrinc, gInter, gAvanz, gCompe, gBaby] = await Promise.all([
     db.group.create({
       data: {
-        gymId: gym.id,
-        name: "Principiantes",
-        monthlyPrice: 15000,
-        maxCapacity: 12,
+        gymId: gym.id, name: "Principiantes", monthlyPrice: 15000, maxCapacity: 12,
         schedules: {
           create: {
             weekDays: ["MONDAY", "WEDNESDAY", "FRIDAY"],
-            startTime: "10:00",
-            endTime: "11:30",
-            startDate: date(2026, 1, 1),
+            startTime: "10:00", endTime: "11:30", startDate: date(2026, 1, 1),
           },
         },
       },
     }),
     db.group.create({
       data: {
-        gymId: gym.id,
-        name: "Intermedio",
-        monthlyPrice: 18000,
-        maxCapacity: 10,
+        gymId: gym.id, name: "Intermedio", monthlyPrice: 18000, maxCapacity: 10,
         schedules: {
           create: {
             weekDays: ["TUESDAY", "THURSDAY"],
-            startTime: "17:00",
-            endTime: "19:00",
-            startDate: date(2026, 1, 1),
+            startTime: "17:00", endTime: "19:00", startDate: date(2026, 1, 1),
           },
         },
       },
     }),
     db.group.create({
       data: {
-        gymId: gym.id,
-        name: "Avanzado",
-        monthlyPrice: 22000,
-        maxCapacity: 8,
+        gymId: gym.id, name: "Avanzado", monthlyPrice: 22000, maxCapacity: 8,
         schedules: {
           create: {
             weekDays: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
-            startTime: "08:00",
-            endTime: "10:00",
-            startDate: date(2026, 1, 1),
+            startTime: "08:00", endTime: "10:00", startDate: date(2026, 1, 1),
           },
         },
       },
     }),
-    // Grupo Competición: Lun-Vie 15:00-18:00 (3 horas)
-    // Caso interesante: 2 entrenadores se dividen las horas
     db.group.create({
       data: {
-        gymId: gym.id,
-        name: "Competición",
-        monthlyPrice: 28000,
-        maxCapacity: 6,
+        gymId: gym.id, name: "Competicion", monthlyPrice: 28000, maxCapacity: 6,
         schedules: {
           create: {
             weekDays: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
-            startTime: "15:00",
-            endTime: "18:00",
-            startDate: date(2026, 1, 1),
+            startTime: "15:00", endTime: "18:00", startDate: date(2026, 1, 1),
           },
         },
       },
     }),
-    // Grupo Baby Gym: Sáb 09:00-10:30 (solo sábados, sin cobertura completa para probar indicador)
     db.group.create({
       data: {
-        gymId: gym.id,
-        name: "Baby Gym",
-        monthlyPrice: 10000,
-        maxCapacity: 15,
+        gymId: gym.id, name: "Baby Gym", monthlyPrice: 10000, maxCapacity: 15,
         schedules: {
           create: {
             weekDays: ["SATURDAY"],
-            startTime: "09:00",
-            endTime: "10:30",
-            startDate: date(2026, 1, 1),
+            startTime: "09:00", endTime: "10:30", startDate: date(2026, 1, 1),
           },
         },
       },
     }),
   ])
 
-  console.log(`✅ Groups: ${groupBeginners.name}, ${groupIntermediate.name}, ${groupAdvanced.name}, ${groupCompetition.name}, ${groupBaby.name}`)
+  console.log("Groups: Principiantes, Intermedio, Avanzado, Competicion, Baby Gym")
 
   // ── Trainers ───────────────────────────────────────────────────────────────
 
-  // Laura: cubre Principiantes completo (L-M-V) + Competición solo L-M-V primeras 2h
-  const trainerLaura = await db.trainer.create({
+  await db.trainer.create({
     data: {
-      gymId: gym.id,
-      name: "Laura Pérez",
+      gymId: gym.id, name: "Laura Perez",
       groups: {
         create: [
           {
-            groupId: groupBeginners.id,
-            hourlyRate: 3000,
+            groupId: gPrinc.id, hourlyRate: 3000,
             schedules: {
               create: [
                 { weekDay: "MONDAY", startTime: "10:00", endTime: "11:30" },
@@ -192,8 +165,7 @@ async function main() {
             },
           },
           {
-            groupId: groupCompetition.id,
-            hourlyRate: 4500,
+            groupId: gCompe.id, hourlyRate: 4500,
             schedules: {
               create: [
                 { weekDay: "MONDAY", startTime: "15:00", endTime: "17:00" },
@@ -207,16 +179,13 @@ async function main() {
     },
   })
 
-  // Marcelo: cubre Intermedio completo + Avanzado completo + Competición solo Ma-Ju completo
-  const trainerMarcelo = await db.trainer.create({
+  await db.trainer.create({
     data: {
-      gymId: gym.id,
-      name: "Marcelo Ruiz",
+      gymId: gym.id, name: "Marcelo Ruiz",
       groups: {
         create: [
           {
-            groupId: groupIntermediate.id,
-            hourlyRate: 3500,
+            groupId: gInter.id, hourlyRate: 3500,
             schedules: {
               create: [
                 { weekDay: "TUESDAY", startTime: "17:00", endTime: "19:00" },
@@ -225,8 +194,7 @@ async function main() {
             },
           },
           {
-            groupId: groupAdvanced.id,
-            hourlyRate: 4000,
+            groupId: gAvanz.id, hourlyRate: 4000,
             schedules: {
               create: [
                 { weekDay: "MONDAY", startTime: "08:00", endTime: "10:00" },
@@ -238,8 +206,7 @@ async function main() {
             },
           },
           {
-            groupId: groupCompetition.id,
-            hourlyRate: 4500,
+            groupId: gCompe.id, hourlyRate: 4500,
             schedules: {
               create: [
                 { weekDay: "TUESDAY", startTime: "15:00", endTime: "18:00" },
@@ -252,17 +219,13 @@ async function main() {
     },
   })
 
-  // Gabriela: cubre Competición L-M-V la última hora (17:00-18:00), complementa a Laura
-  // También cubre Baby Gym sábado pero solo 45 minutos (cobertura parcial)
-  const trainerGabriela = await db.trainer.create({
+  await db.trainer.create({
     data: {
-      gymId: gym.id,
-      name: "Gabriela Díaz",
+      gymId: gym.id, name: "Gabriela Diaz",
       groups: {
         create: [
           {
-            groupId: groupCompetition.id,
-            hourlyRate: 3000,
+            groupId: gCompe.id, hourlyRate: 3000,
             schedules: {
               create: [
                 { weekDay: "MONDAY", startTime: "17:00", endTime: "18:00" },
@@ -272,8 +235,7 @@ async function main() {
             },
           },
           {
-            groupId: groupBaby.id,
-            hourlyRate: 2500,
+            groupId: gBaby.id, hourlyRate: 2500,
             schedules: {
               create: [
                 { weekDay: "SATURDAY", startTime: "09:00", endTime: "09:45" },
@@ -285,181 +247,47 @@ async function main() {
     },
   })
 
-  // Nicolás: entrenador inactivo (dado de baja) — para probar soft delete
-  const trainerNicolas = await db.trainer.create({
-    data: {
-      gymId: gym.id,
-      name: "Nicolás Vega",
-      active: false,
-    },
+  await db.trainer.create({
+    data: { gymId: gym.id, name: "Nicolas Vega", active: false },
   })
 
-  console.log(`✅ Trainers:`)
-  console.log(`   Laura ($3k/h Principiantes, $4.5k/h Competición L-M-V 15-17h)`)
-  console.log(`   Marcelo ($3.5k/h Intermedio, $4k/h Avanzado, $4.5k/h Competición Ma-Ju)`)
-  console.log(`   Gabriela ($3k/h Competición L-M-V 17-18h, $2.5k/h Baby Gym 09:00-09:45)`)
-  console.log(`   Nicolás (INACTIVO)`)
+  console.log("Trainers: Laura, Marcelo, Gabriela, Nicolas (inactivo)")
 
   // ── Students ───────────────────────────────────────────────────────────────
-  // Mix of situations:
-  //   - Students in one group, some in two groups
-  //   - Different dueDays (simulates different join dates)
-  //   - One inactive student (leftAt set)
 
-  const studentsData = [
-    // Principiantes only
-    {
-      firstName: "Ana",
-      lastName: "García",
-      phone: "1123456789",
-      joinedAt: date(2025, 10, 5),
-      dueDay: 5,
-      groups: [groupBeginners.id],
-    },
-    {
-      firstName: "Carlos",
-      lastName: "López",
-      phone: "1198765432",
-      joinedAt: date(2025, 11, 12),
-      dueDay: 12,
-      groups: [groupBeginners.id],
-    },
-    {
-      firstName: "Martina",
-      lastName: "Álvarez",
-      phone: "1167890123",
-      joinedAt: date(2026, 1, 15),
-      dueDay: 15,
-      groups: [groupBeginners.id],
-    },
-    // Intermedio only
-    {
-      firstName: "Sofía",
-      lastName: "Martínez",
-      phone: "1134567890",
-      nationalId: "38111222",
-      joinedAt: date(2026, 1, 1),
-      dueDay: 1,
-      groups: [groupIntermediate.id],
-    },
-    {
-      firstName: "Tomás",
-      lastName: "Fernández",
-      phone: "1156789012",
-      joinedAt: date(2025, 9, 20),
-      dueDay: 20,
-      groups: [groupIntermediate.id],
-    },
-    {
-      firstName: "Lautaro",
-      lastName: "Giménez",
-      phone: "1101234567",
-      joinedAt: date(2025, 11, 1),
-      dueDay: 1,
-      groups: [groupIntermediate.id],
-    },
-    // Avanzado only
-    {
-      firstName: "Valentina",
-      lastName: "Rodríguez",
-      phone: "1178901234",
-      nationalId: "40333444",
-      joinedAt: date(2025, 8, 15),
-      dueDay: 15,
-      groups: [groupAdvanced.id],
-    },
-    {
-      firstName: "Joaquín",
-      lastName: "Herrera",
-      phone: "1189012345",
-      nationalId: "41555666",
-      joinedAt: date(2025, 7, 10),
-      dueDay: 10,
-      groups: [groupAdvanced.id],
-    },
-    // Competición only
-    {
-      firstName: "Milagros",
-      lastName: "Romero",
-      phone: "1145671234",
-      nationalId: "39222333",
-      joinedAt: date(2025, 6, 1),
-      dueDay: 1,
-      groups: [groupCompetition.id],
-    },
-    {
-      firstName: "Agustina",
-      lastName: "Cabrera",
-      phone: "1156782345",
-      nationalId: "40444555",
-      joinedAt: date(2025, 9, 1),
-      dueDay: 1,
-      groups: [groupCompetition.id],
-    },
-    {
-      firstName: "Florencia",
-      lastName: "Molina",
-      phone: "1167893456",
-      joinedAt: date(2026, 1, 10),
-      dueDay: 10,
-      groups: [groupCompetition.id],
-    },
+  type StudentSeed = {
+    firstName: string; lastName: string; phone?: string; nationalId?: string
+    birthDate?: Date; joinedAt: Date; leftAt?: Date; status?: "ACTIVO" | "INACTIVO" | "PRUEBA"
+    trialEndsAt?: Date; dueDay: number; groups: string[]
+  }
+
+  const studentsData: StudentSeed[] = [
+    // Principiantes
+    { firstName: "Ana", lastName: "Garcia", phone: "1123456789", joinedAt: date(2025, 10, 5), dueDay: 5, groups: [gPrinc.id] },
+    { firstName: "Carlos", lastName: "Lopez", phone: "1198765432", joinedAt: date(2025, 11, 12), dueDay: 12, groups: [gPrinc.id] },
+    { firstName: "Martina", lastName: "Alvarez", phone: "1167890123", joinedAt: date(2026, 1, 15), dueDay: 15, groups: [gPrinc.id] },
+    // Intermedio
+    { firstName: "Sofia", lastName: "Martinez", phone: "1134567890", nationalId: "38111222", joinedAt: date(2026, 1, 1), dueDay: 1, groups: [gInter.id] },
+    { firstName: "Tomas", lastName: "Fernandez", phone: "1156789012", joinedAt: date(2025, 9, 20), dueDay: 20, groups: [gInter.id] },
+    { firstName: "Lautaro", lastName: "Gimenez", phone: "1101234567", joinedAt: date(2025, 11, 1), dueDay: 1, groups: [gInter.id] },
+    // Avanzado
+    { firstName: "Valentina", lastName: "Rodriguez", phone: "1178901234", nationalId: "40333444", joinedAt: date(2025, 8, 15), dueDay: 15, groups: [gAvanz.id] },
+    { firstName: "Joaquin", lastName: "Herrera", phone: "1189012345", nationalId: "41555666", joinedAt: date(2025, 7, 10), dueDay: 10, groups: [gAvanz.id] },
+    // Competicion
+    { firstName: "Milagros", lastName: "Romero", phone: "1145671234", nationalId: "39222333", joinedAt: date(2025, 6, 1), dueDay: 1, groups: [gCompe.id] },
+    { firstName: "Agustina", lastName: "Cabrera", phone: "1156782345", nationalId: "40444555", joinedAt: date(2025, 9, 1), dueDay: 1, groups: [gCompe.id] },
+    { firstName: "Florencia", lastName: "Molina", phone: "1167893456", joinedAt: date(2026, 1, 10), dueDay: 10, groups: [gCompe.id] },
     // Baby Gym
-    {
-      firstName: "Isabella",
-      lastName: "Paz",
-      phone: "1178904567",
-      birthDate: date(2021, 3, 15),
-      joinedAt: date(2026, 2, 1),
-      dueDay: 1,
-      groups: [groupBaby.id],
-    },
-    {
-      firstName: "Mateo",
-      lastName: "Ríos",
-      phone: "1189015678",
-      birthDate: date(2020, 8, 22),
-      joinedAt: date(2026, 2, 1),
-      dueDay: 1,
-      groups: [groupBaby.id],
-    },
+    { firstName: "Isabella", lastName: "Paz", phone: "1178904567", birthDate: date(2021, 3, 15), joinedAt: date(2026, 2, 1), dueDay: 1, groups: [gBaby.id] },
+    { firstName: "Mateo", lastName: "Rios", phone: "1189015678", birthDate: date(2020, 8, 22), joinedAt: date(2026, 2, 1), dueDay: 1, groups: [gBaby.id] },
     // Multi-grupo
-    {
-      firstName: "Lucas",
-      lastName: "Sánchez",
-      phone: "1190123456",
-      joinedAt: date(2026, 2, 3),
-      dueDay: 3,
-      groups: [groupBeginners.id, groupIntermediate.id],
-    },
-    {
-      firstName: "Camila",
-      lastName: "Torres",
-      phone: "1112345678",
-      joinedAt: date(2025, 12, 8),
-      dueDay: 8,
-      groups: [groupBeginners.id, groupAdvanced.id],
-    },
-    {
-      firstName: "Emilia",
-      lastName: "Suárez",
-      phone: "1123456780",
-      nationalId: "39888999",
-      joinedAt: date(2025, 10, 1),
-      dueDay: 1,
-      groups: [groupAdvanced.id, groupCompetition.id],
-    },
-    // Inactive student
-    {
-      firstName: "Diego",
-      lastName: "Morales",
-      phone: "1145678901",
-      joinedAt: date(2025, 6, 1),
-      leftAt: date(2026, 1, 31),
-      status: "INACTIVO" as const,
-      dueDay: 1,
-      groups: [groupBeginners.id],
-    },
+    { firstName: "Lucas", lastName: "Sanchez", phone: "1190123456", joinedAt: date(2026, 2, 3), dueDay: 3, groups: [gPrinc.id, gInter.id] },
+    { firstName: "Camila", lastName: "Torres", phone: "1112345678", joinedAt: date(2025, 12, 8), dueDay: 8, groups: [gPrinc.id, gAvanz.id] },
+    { firstName: "Emilia", lastName: "Suarez", phone: "1123456780", nationalId: "39888999", joinedAt: date(2025, 10, 1), dueDay: 1, groups: [gAvanz.id, gCompe.id] },
+    // Inactivo
+    { firstName: "Diego", lastName: "Morales", phone: "1145678901", joinedAt: date(2025, 6, 1), leftAt: date(2026, 1, 31), status: "INACTIVO", dueDay: 1, groups: [gPrinc.id] },
+    // Prueba
+    { firstName: "Renata", lastName: "Vidal", phone: "1199887766", joinedAt: date(2026, 3, 10), status: "PRUEBA", trialEndsAt: date(2026, 4, 10), dueDay: 10, groups: [gPrinc.id] },
   ]
 
   const students = await Promise.all(
@@ -479,22 +307,15 @@ async function main() {
     )
   )
 
-  console.log(`✅ Students: ${students.map((s) => s.firstName).join(", ")}`)
+  console.log(`Students: ${students.length} (${students.filter(s => s.status === "ACTIVO").length} activos, 1 inactivo, 1 prueba)`)
 
   // ── Payments ───────────────────────────────────────────────────────────────
-  // Generates payments for January, February, and March 2026.
-  // January: mostly paid (simulates closed month)
-  // February: mix of paid and pending
-  // March: realistic current state (some paid, some pending, some expired)
 
   const activeStudents = students.filter((s) => s.status !== "INACTIVO")
 
-  // Compute each student's total monthly fee (sum of all enrolled groups)
+  // Compute each student's total monthly fee
   const monthlyAmounts: Record<string, number> = {}
   for (const s of activeStudents) {
-    const studentData = studentsData.find(
-      (d) => d.firstName === s.firstName && d.lastName === s.lastName
-    )!
     const enrollments = await db.studentGroup.findMany({
       where: { studentId: s.id },
       include: { group: true },
@@ -502,68 +323,77 @@ async function main() {
     monthlyAmounts[s.id] = enrollments.reduce((sum, sg) => sum + Number(sg.group.monthlyPrice), 0)
   }
 
-  // January 2026 — closed month, almost all paid
-  const januaryPayments = [
-    { student: "Ana",       status: "PAID",    paidAt: date(2026, 1, 5),  paymentMethod: "EFECTIVO"       as const },
-    { student: "Carlos",    status: "PAID",    paidAt: date(2026, 1, 14), paymentMethod: "TRANSFERENCIA"  as const },
-    { student: "Martina",   status: "PAID",    paidAt: date(2026, 1, 16), paymentMethod: "EFECTIVO"       as const },
-    { student: "Sofía",     status: "PAID",    paidAt: date(2026, 1, 3),  paymentMethod: "TARJETA"        as const },
-    { student: "Tomás",     status: "PAID",    paidAt: date(2026, 1, 22), paymentMethod: "EFECTIVO"       as const },
-    { student: "Lautaro",   status: "PAID",    paidAt: date(2026, 1, 5),  paymentMethod: "TRANSFERENCIA"  as const },
-    { student: "Valentina", status: "PAID",    paidAt: date(2026, 1, 16), paymentMethod: "EFECTIVO"       as const },
-    { student: "Joaquín",   status: "PAID",    paidAt: date(2026, 1, 12), paymentMethod: "TARJETA"        as const },
-    { student: "Milagros",  status: "PAID",    paidAt: date(2026, 1, 3),  paymentMethod: "EFECTIVO"       as const },
-    { student: "Agustina",  status: "PAID",    paidAt: date(2026, 1, 5),  paymentMethod: "TRANSFERENCIA"  as const },
-    { student: "Florencia", status: "PAID",    paidAt: date(2026, 1, 12), paymentMethod: "TARJETA"        as const },
-    { student: "Lucas",     status: "EXPIRED", paidAt: null,              paymentMethod: null              },
-    { student: "Camila",    status: "PAID",    paidAt: date(2026, 1, 10), paymentMethod: "EFECTIVO"       as const },
-    { student: "Emilia",    status: "PAID",    paidAt: date(2026, 1, 5),  paymentMethod: "TRANSFERENCIA"  as const },
-  ] as const
+  type PaymentEntry = {
+    student: string
+    status: "PAID" | "PENDING" | "EXPIRED"
+    paidAt: Date | null
+    paymentMethod: "EFECTIVO" | "TRANSFERENCIA" | "TARJETA" | null
+  }
 
-  // February 2026 — past month, mix of paid and pending
-  const februaryPayments = [
-    { student: "Ana",       status: "PAID",    paidAt: date(2026, 2, 6),  paymentMethod: "TRANSFERENCIA"  as const },
-    { student: "Carlos",    status: "PAID",    paidAt: date(2026, 2, 14), paymentMethod: "EFECTIVO"       as const },
-    { student: "Martina",   status: "PAID",    paidAt: date(2026, 2, 16), paymentMethod: "TARJETA"        as const },
-    { student: "Sofía",     status: "PAID",    paidAt: date(2026, 2, 2),  paymentMethod: "EFECTIVO"       as const },
-    { student: "Tomás",     status: "PAID",    paidAt: date(2026, 2, 21), paymentMethod: "TRANSFERENCIA"  as const },
-    { student: "Lautaro",   status: "PENDING", paidAt: null,              paymentMethod: null              },
-    { student: "Valentina", status: "PENDING", paidAt: null,              paymentMethod: null              },
-    { student: "Joaquín",   status: "PAID",    paidAt: date(2026, 2, 11), paymentMethod: "EFECTIVO"       as const },
-    { student: "Milagros",  status: "PAID",    paidAt: date(2026, 2, 3),  paymentMethod: "TARJETA"        as const },
-    { student: "Agustina",  status: "PAID",    paidAt: date(2026, 2, 6),  paymentMethod: "EFECTIVO"       as const },
-    { student: "Florencia", status: "PENDING", paidAt: null,              paymentMethod: null              },
-    { student: "Isabella",  status: "PAID",    paidAt: date(2026, 2, 2),  paymentMethod: "EFECTIVO"       as const },
-    { student: "Mateo",     status: "PAID",    paidAt: date(2026, 2, 3),  paymentMethod: "TRANSFERENCIA"  as const },
-    { student: "Lucas",     status: "PAID",    paidAt: date(2026, 2, 5),  paymentMethod: "TARJETA"        as const },
-    { student: "Camila",    status: "PENDING", paidAt: null,              paymentMethod: null              },
-    { student: "Emilia",    status: "PAID",    paidAt: date(2026, 2, 4),  paymentMethod: "EFECTIVO"       as const },
-  ] as const
+  // January 2026 - closed month, almost all paid
+  const january: PaymentEntry[] = [
+    { student: "Ana",       status: "PAID",    paidAt: date(2026, 1, 5),  paymentMethod: PM.E },
+    { student: "Carlos",    status: "PAID",    paidAt: date(2026, 1, 14), paymentMethod: PM.T },
+    { student: "Martina",   status: "PAID",    paidAt: date(2026, 1, 16), paymentMethod: PM.E },
+    { student: "Sofia",     status: "PAID",    paidAt: date(2026, 1, 3),  paymentMethod: PM.C },
+    { student: "Tomas",     status: "PAID",    paidAt: date(2026, 1, 22), paymentMethod: PM.E },
+    { student: "Lautaro",   status: "PAID",    paidAt: date(2026, 1, 5),  paymentMethod: PM.T },
+    { student: "Valentina", status: "PAID",    paidAt: date(2026, 1, 16), paymentMethod: PM.E },
+    { student: "Joaquin",   status: "PAID",    paidAt: date(2026, 1, 12), paymentMethod: PM.C },
+    { student: "Milagros",  status: "PAID",    paidAt: date(2026, 1, 3),  paymentMethod: PM.E },
+    { student: "Agustina",  status: "PAID",    paidAt: date(2026, 1, 5),  paymentMethod: PM.T },
+    { student: "Florencia", status: "PAID",    paidAt: date(2026, 1, 12), paymentMethod: PM.C },
+    { student: "Lucas",     status: "EXPIRED", paidAt: null,              paymentMethod: null },
+    { student: "Camila",    status: "PAID",    paidAt: date(2026, 1, 10), paymentMethod: PM.E },
+    { student: "Emilia",    status: "PAID",    paidAt: date(2026, 1, 5),  paymentMethod: PM.T },
+  ]
 
-  // March 2026 — current month, realistic in-progress state
-  const marchPayments = [
-    { student: "Ana",       status: "PAID",    paidAt: date(2026, 3, 5),  paymentMethod: "EFECTIVO"       as const },
-    { student: "Carlos",    status: "PENDING", paidAt: null,              paymentMethod: null              },
-    { student: "Martina",   status: "PAID",    paidAt: date(2026, 3, 15), paymentMethod: "TRANSFERENCIA"  as const },
-    { student: "Sofía",     status: "PAID",    paidAt: date(2026, 3, 2),  paymentMethod: "TARJETA"        as const },
-    { student: "Tomás",     status: "PENDING", paidAt: null,              paymentMethod: null              },
-    { student: "Lautaro",   status: "PAID",    paidAt: date(2026, 3, 3),  paymentMethod: "EFECTIVO"       as const },
-    { student: "Valentina", status: "PAID",    paidAt: date(2026, 3, 15), paymentMethod: "TRANSFERENCIA"  as const },
-    { student: "Joaquín",   status: "PENDING", paidAt: null,              paymentMethod: null              },
-    { student: "Milagros",  status: "PAID",    paidAt: date(2026, 3, 2),  paymentMethod: "EFECTIVO"       as const },
-    { student: "Agustina",  status: "EXPIRED", paidAt: null,              paymentMethod: null              },
-    { student: "Florencia", status: "PAID",    paidAt: date(2026, 3, 11), paymentMethod: "TARJETA"        as const },
-    { student: "Isabella",  status: "PAID",    paidAt: date(2026, 3, 2),  paymentMethod: "EFECTIVO"       as const },
-    { student: "Mateo",     status: "PENDING", paidAt: null,              paymentMethod: null              },
-    { student: "Lucas",     status: "PAID",    paidAt: date(2026, 3, 4),  paymentMethod: "TRANSFERENCIA"  as const },
-    { student: "Camila",    status: "EXPIRED", paidAt: null,              paymentMethod: null              },
-    { student: "Emilia",    status: "PAID",    paidAt: date(2026, 3, 3),  paymentMethod: "EFECTIVO"       as const },
-  ] as const
+  // February 2026 - mix of paid, pending, expired
+  const february: PaymentEntry[] = [
+    { student: "Ana",       status: "PAID",    paidAt: date(2026, 2, 6),  paymentMethod: PM.T },
+    { student: "Carlos",    status: "PAID",    paidAt: date(2026, 2, 14), paymentMethod: PM.E },
+    { student: "Martina",   status: "PAID",    paidAt: date(2026, 2, 16), paymentMethod: PM.C },
+    { student: "Sofia",     status: "PAID",    paidAt: date(2026, 2, 2),  paymentMethod: PM.E },
+    { student: "Tomas",     status: "PAID",    paidAt: date(2026, 2, 21), paymentMethod: PM.T },
+    { student: "Lautaro",   status: "EXPIRED", paidAt: null,              paymentMethod: null },
+    { student: "Valentina", status: "EXPIRED", paidAt: null,              paymentMethod: null },
+    { student: "Joaquin",   status: "PAID",    paidAt: date(2026, 2, 11), paymentMethod: PM.E },
+    { student: "Milagros",  status: "PAID",    paidAt: date(2026, 2, 3),  paymentMethod: PM.C },
+    { student: "Agustina",  status: "PAID",    paidAt: date(2026, 2, 6),  paymentMethod: PM.E },
+    { student: "Florencia", status: "EXPIRED", paidAt: null,              paymentMethod: null },
+    { student: "Isabella",  status: "PAID",    paidAt: date(2026, 2, 2),  paymentMethod: PM.E },
+    { student: "Mateo",     status: "PAID",    paidAt: date(2026, 2, 3),  paymentMethod: PM.T },
+    { student: "Lucas",     status: "PAID",    paidAt: date(2026, 2, 5),  paymentMethod: PM.C },
+    { student: "Camila",    status: "EXPIRED", paidAt: null,              paymentMethod: null },
+    { student: "Emilia",    status: "PAID",    paidAt: date(2026, 2, 4),  paymentMethod: PM.E },
+  ]
 
+  // March 2026 - current month, in-progress
+  const march: PaymentEntry[] = [
+    { student: "Ana",       status: "PAID",    paidAt: date(2026, 3, 5),  paymentMethod: PM.E },
+    { student: "Carlos",    status: "PENDING", paidAt: null,              paymentMethod: null },
+    { student: "Martina",   status: "PAID",    paidAt: date(2026, 3, 15), paymentMethod: PM.T },
+    { student: "Sofia",     status: "PAID",    paidAt: date(2026, 3, 2),  paymentMethod: PM.C },
+    { student: "Tomas",     status: "PENDING", paidAt: null,              paymentMethod: null },
+    { student: "Lautaro",   status: "PAID",    paidAt: date(2026, 3, 3),  paymentMethod: PM.E },
+    { student: "Valentina", status: "PAID",    paidAt: date(2026, 3, 15), paymentMethod: PM.T },
+    { student: "Joaquin",   status: "PENDING", paidAt: null,              paymentMethod: null },
+    { student: "Milagros",  status: "PAID",    paidAt: date(2026, 3, 2),  paymentMethod: PM.E },
+    { student: "Agustina",  status: "EXPIRED", paidAt: null,              paymentMethod: null },
+    { student: "Florencia", status: "PAID",    paidAt: date(2026, 3, 11), paymentMethod: PM.C },
+    { student: "Isabella",  status: "PAID",    paidAt: date(2026, 3, 2),  paymentMethod: PM.E },
+    { student: "Mateo",     status: "PENDING", paidAt: null,              paymentMethod: null },
+    { student: "Lucas",     status: "PAID",    paidAt: date(2026, 3, 4),  paymentMethod: PM.T },
+    { student: "Camila",    status: "EXPIRED", paidAt: null,              paymentMethod: null },
+    { student: "Emilia",    status: "PAID",    paidAt: date(2026, 3, 3),  paymentMethod: PM.E },
+    { student: "Renata",    status: "PENDING", paidAt: null,              paymentMethod: null },
+  ]
+
+  let paymentCount = 0
   for (const [period, entries] of [
-    [firstOfMonth(2026, 1), januaryPayments],
-    [firstOfMonth(2026, 2), februaryPayments],
-    [firstOfMonth(2026, 3), marchPayments],
+    [firstOfMonth(2026, 1), january],
+    [firstOfMonth(2026, 2), february],
+    [firstOfMonth(2026, 3), march],
   ] as const) {
     for (const entry of entries) {
       const student = students.find((s) => s.firstName === entry.student)!
@@ -574,45 +404,283 @@ async function main() {
           period,
           amount: monthlyAmounts[student.id],
           status: entry.status,
-          paidAt: entry.paidAt ?? null,
+          paidAt: entry.paidAt,
           paymentMethod: entry.paymentMethod,
         },
       })
+      paymentCount++
     }
   }
 
-  console.log(`✅ Payments: Enero (14) + Febrero (16) + Marzo (16 registros)`)
+  console.log(`Payments: ${paymentCount} (Ene + Feb + Mar 2026)`)
+
+  console.log(`\n--- GYM360 Central listo ---\n`)
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // GYM 2: GYM360 Palermo — gimnasio rentable con márgenes positivos
+  // ════════════════════════════════════════════════════════════════════════════
+
+  const gym2 = await db.gym.create({
+    data: {
+      ownerId: owner.owner!.id,
+      name: "GYM360 Palermo",
+      address: "Av. Santa Fe 3200, CABA",
+      phone: "011-5555-6666",
+    },
+  })
+
+  console.log(`Gym 2: ${gym2.name} (${gym2.id})`)
+
+  // ── Fixed Expenses (bajos) ──
+
+  await db.fixedExpense.createMany({
+    data: [
+      { gymId: gym2.id, name: "Alquiler", amount: 80000 },
+      { gymId: gym2.id, name: "Servicios", amount: 15000 },
+      { gymId: gym2.id, name: "Seguro", amount: 8000 },
+    ],
+  })
+
+  console.log("Gym2 Fixed expenses: $103.000/mes")
+
+  // ── Groups (precios altos, buena ocupacion) ──
+
+  const [g2Iniciacion, g2Formativo, g2Elite] = await Promise.all([
+    db.group.create({
+      data: {
+        gymId: gym2.id, name: "Iniciacion", monthlyPrice: 25000, maxCapacity: 15,
+        schedules: {
+          create: {
+            weekDays: ["MONDAY", "WEDNESDAY", "FRIDAY"],
+            startTime: "09:00", endTime: "10:30", startDate: date(2026, 1, 1),
+          },
+        },
+      },
+    }),
+    db.group.create({
+      data: {
+        gymId: gym2.id, name: "Formativo", monthlyPrice: 32000, maxCapacity: 12,
+        schedules: {
+          create: {
+            weekDays: ["TUESDAY", "THURSDAY", "SATURDAY"],
+            startTime: "16:00", endTime: "18:00", startDate: date(2026, 1, 1),
+          },
+        },
+      },
+    }),
+    db.group.create({
+      data: {
+        gymId: gym2.id, name: "Elite", monthlyPrice: 45000, maxCapacity: 8,
+        schedules: {
+          create: {
+            weekDays: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
+            startTime: "14:00", endTime: "16:00", startDate: date(2026, 1, 1),
+          },
+        },
+      },
+    }),
+  ])
+
+  console.log("Gym2 Groups: Iniciacion ($25k), Formativo ($32k), Elite ($45k)")
+
+  // ── Trainers (tarifas moderadas) ──
+
+  await db.trainer.create({
+    data: {
+      gymId: gym2.id, name: "Carolina Mendez",
+      groups: {
+        create: [
+          {
+            groupId: g2Iniciacion.id, hourlyRate: 2500,
+            schedules: {
+              create: [
+                { weekDay: "MONDAY", startTime: "09:00", endTime: "10:30" },
+                { weekDay: "WEDNESDAY", startTime: "09:00", endTime: "10:30" },
+                { weekDay: "FRIDAY", startTime: "09:00", endTime: "10:30" },
+              ],
+            },
+          },
+          {
+            groupId: g2Formativo.id, hourlyRate: 3000,
+            schedules: {
+              create: [
+                { weekDay: "TUESDAY", startTime: "16:00", endTime: "18:00" },
+                { weekDay: "THURSDAY", startTime: "16:00", endTime: "18:00" },
+                { weekDay: "SATURDAY", startTime: "16:00", endTime: "18:00" },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  })
+
+  await db.trainer.create({
+    data: {
+      gymId: gym2.id, name: "Federico Arias",
+      groups: {
+        create: [
+          {
+            groupId: g2Elite.id, hourlyRate: 3500,
+            schedules: {
+              create: [
+                { weekDay: "MONDAY", startTime: "14:00", endTime: "16:00" },
+                { weekDay: "TUESDAY", startTime: "14:00", endTime: "16:00" },
+                { weekDay: "WEDNESDAY", startTime: "14:00", endTime: "16:00" },
+                { weekDay: "THURSDAY", startTime: "14:00", endTime: "16:00" },
+                { weekDay: "FRIDAY", startTime: "14:00", endTime: "16:00" },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  })
+
+  console.log("Gym2 Trainers: Carolina (Iniciacion + Formativo), Federico (Elite)")
+
+  // ── Students (muchos, buena ocupacion) ──
+
+  type StudentSeed2 = {
+    firstName: string; lastName: string; phone?: string
+    joinedAt: Date; dueDay: number; groups: string[]
+  }
+
+  const students2Data: StudentSeed2[] = [
+    // Iniciacion (12 de 15 = 80%)
+    { firstName: "Paula", lastName: "Rivas", phone: "1111000001", joinedAt: date(2025, 8, 1), dueDay: 1, groups: [g2Iniciacion.id] },
+    { firstName: "Clara", lastName: "Dominguez", phone: "1111000002", joinedAt: date(2025, 8, 5), dueDay: 5, groups: [g2Iniciacion.id] },
+    { firstName: "Lucia", lastName: "Pereyra", phone: "1111000003", joinedAt: date(2025, 9, 1), dueDay: 1, groups: [g2Iniciacion.id] },
+    { firstName: "Maia", lastName: "Acosta", phone: "1111000004", joinedAt: date(2025, 9, 10), dueDay: 10, groups: [g2Iniciacion.id] },
+    { firstName: "Delfina", lastName: "Castro", phone: "1111000005", joinedAt: date(2025, 10, 1), dueDay: 1, groups: [g2Iniciacion.id] },
+    { firstName: "Alma", lastName: "Medina", phone: "1111000006", joinedAt: date(2025, 10, 15), dueDay: 15, groups: [g2Iniciacion.id] },
+    { firstName: "Bianca", lastName: "Rojas", phone: "1111000007", joinedAt: date(2025, 11, 1), dueDay: 1, groups: [g2Iniciacion.id] },
+    { firstName: "Pilar", lastName: "Navarro", phone: "1111000008", joinedAt: date(2025, 11, 5), dueDay: 5, groups: [g2Iniciacion.id] },
+    { firstName: "Juana", lastName: "Ortiz", phone: "1111000009", joinedAt: date(2025, 12, 1), dueDay: 1, groups: [g2Iniciacion.id] },
+    { firstName: "Elena", lastName: "Silva", phone: "1111000010", joinedAt: date(2026, 1, 1), dueDay: 1, groups: [g2Iniciacion.id] },
+    { firstName: "Nina", lastName: "Vargas", phone: "1111000011", joinedAt: date(2026, 1, 10), dueDay: 10, groups: [g2Iniciacion.id] },
+    { firstName: "Zoe", lastName: "Aguirre", phone: "1111000012", joinedAt: date(2026, 2, 1), dueDay: 1, groups: [g2Iniciacion.id] },
+    // Formativo (10 de 12 = 83%)
+    { firstName: "Abril", lastName: "Luna", phone: "1111000013", joinedAt: date(2025, 7, 1), dueDay: 1, groups: [g2Formativo.id] },
+    { firstName: "Catalina", lastName: "Flores", phone: "1111000014", joinedAt: date(2025, 7, 10), dueDay: 10, groups: [g2Formativo.id] },
+    { firstName: "Victoria", lastName: "Guerrero", phone: "1111000015", joinedAt: date(2025, 8, 1), dueDay: 1, groups: [g2Formativo.id] },
+    { firstName: "Olivia", lastName: "Sosa", phone: "1111000016", joinedAt: date(2025, 9, 1), dueDay: 1, groups: [g2Formativo.id] },
+    { firstName: "Antonella", lastName: "Campos", phone: "1111000017", joinedAt: date(2025, 9, 15), dueDay: 15, groups: [g2Formativo.id] },
+    { firstName: "Lola", lastName: "Vera", phone: "1111000018", joinedAt: date(2025, 10, 1), dueDay: 1, groups: [g2Formativo.id] },
+    { firstName: "Sara", lastName: "Godoy", phone: "1111000019", joinedAt: date(2025, 11, 1), dueDay: 1, groups: [g2Formativo.id] },
+    { firstName: "Jazmín", lastName: "Ibarra", phone: "1111000020", joinedAt: date(2025, 11, 10), dueDay: 10, groups: [g2Formativo.id] },
+    { firstName: "Rocio", lastName: "Ledesma", phone: "1111000021", joinedAt: date(2026, 1, 1), dueDay: 1, groups: [g2Formativo.id] },
+    { firstName: "Candela", lastName: "Figueroa", phone: "1111000022", joinedAt: date(2026, 2, 1), dueDay: 1, groups: [g2Formativo.id] },
+    // Elite (7 de 8 = 88%)
+    { firstName: "Sol", lastName: "Montenegro", phone: "1111000023", joinedAt: date(2025, 6, 1), dueDay: 1, groups: [g2Elite.id] },
+    { firstName: "Luz", lastName: "Villarreal", phone: "1111000024", joinedAt: date(2025, 7, 1), dueDay: 1, groups: [g2Elite.id] },
+    { firstName: "Mila", lastName: "Ponce", phone: "1111000025", joinedAt: date(2025, 8, 1), dueDay: 1, groups: [g2Elite.id] },
+    { firstName: "Uma", lastName: "Quiroga", phone: "1111000026", joinedAt: date(2025, 9, 1), dueDay: 1, groups: [g2Elite.id] },
+    { firstName: "Gala", lastName: "Espinoza", phone: "1111000027", joinedAt: date(2025, 10, 1), dueDay: 1, groups: [g2Elite.id] },
+    { firstName: "Mora", lastName: "Correa", phone: "1111000028", joinedAt: date(2025, 11, 1), dueDay: 1, groups: [g2Elite.id] },
+    { firstName: "India", lastName: "Bustos", phone: "1111000029", joinedAt: date(2026, 1, 1), dueDay: 1, groups: [g2Elite.id] },
+  ]
+
+  const students2 = await Promise.all(
+    students2Data.map(({ groups, ...data }) =>
+      db.student.create({
+        data: {
+          gymId: gym2.id,
+          ...data,
+          groups: {
+            create: groups.map((groupId) => ({
+              groupId,
+              enrolledAt: data.joinedAt,
+            })),
+          },
+        },
+      })
+    )
+  )
+
+  console.log(`Gym2 Students: ${students2.length} (Iniciacion 12, Formativo 10, Elite 7)`)
+
+  // ── Payments (casi todo pagado = gym rentable) ──
+
+  const monthlyAmounts2: Record<string, number> = {}
+  for (const s of students2) {
+    const enrollments = await db.studentGroup.findMany({
+      where: { studentId: s.id },
+      include: { group: true },
+    })
+    monthlyAmounts2[s.id] = enrollments.reduce((sum, sg) => sum + Number(sg.group.monthlyPrice), 0)
+  }
+
+  // March — almost all paid (rentable)
+  const gym2March: PaymentEntry[] = [
+    // Iniciacion: 11 de 12 pagaron
+    { student: "Paula",     status: "PAID",    paidAt: date(2026, 3, 2),  paymentMethod: PM.T },
+    { student: "Clara",     status: "PAID",    paidAt: date(2026, 3, 5),  paymentMethod: PM.E },
+    { student: "Lucia",     status: "PAID",    paidAt: date(2026, 3, 1),  paymentMethod: PM.T },
+    { student: "Maia",      status: "PAID",    paidAt: date(2026, 3, 10), paymentMethod: PM.C },
+    { student: "Delfina",   status: "PAID",    paidAt: date(2026, 3, 3),  paymentMethod: PM.E },
+    { student: "Alma",      status: "PAID",    paidAt: date(2026, 3, 15), paymentMethod: PM.T },
+    { student: "Bianca",    status: "PAID",    paidAt: date(2026, 3, 2),  paymentMethod: PM.E },
+    { student: "Pilar",     status: "PAID",    paidAt: date(2026, 3, 6),  paymentMethod: PM.C },
+    { student: "Juana",     status: "PAID",    paidAt: date(2026, 3, 1),  paymentMethod: PM.T },
+    { student: "Elena",     status: "PAID",    paidAt: date(2026, 3, 3),  paymentMethod: PM.E },
+    { student: "Nina",      status: "PAID",    paidAt: date(2026, 3, 11), paymentMethod: PM.T },
+    { student: "Zoe",       status: "PENDING", paidAt: null,              paymentMethod: null },
+    // Formativo: 9 de 10 pagaron
+    { student: "Abril",     status: "PAID",    paidAt: date(2026, 3, 1),  paymentMethod: PM.E },
+    { student: "Catalina",  status: "PAID",    paidAt: date(2026, 3, 10), paymentMethod: PM.T },
+    { student: "Victoria",  status: "PAID",    paidAt: date(2026, 3, 2),  paymentMethod: PM.C },
+    { student: "Olivia",    status: "PAID",    paidAt: date(2026, 3, 3),  paymentMethod: PM.E },
+    { student: "Antonella", status: "PAID",    paidAt: date(2026, 3, 15), paymentMethod: PM.T },
+    { student: "Lola",      status: "PAID",    paidAt: date(2026, 3, 2),  paymentMethod: PM.E },
+    { student: "Sara",      status: "PAID",    paidAt: date(2026, 3, 4),  paymentMethod: PM.C },
+    { student: "Jazmín",    status: "PAID",    paidAt: date(2026, 3, 11), paymentMethod: PM.T },
+    { student: "Rocio",     status: "PAID",    paidAt: date(2026, 3, 1),  paymentMethod: PM.E },
+    { student: "Candela",   status: "PENDING", paidAt: null,              paymentMethod: null },
+    // Elite: todos pagaron
+    { student: "Sol",       status: "PAID",    paidAt: date(2026, 3, 1),  paymentMethod: PM.T },
+    { student: "Luz",       status: "PAID",    paidAt: date(2026, 3, 2),  paymentMethod: PM.E },
+    { student: "Mila",      status: "PAID",    paidAt: date(2026, 3, 1),  paymentMethod: PM.C },
+    { student: "Uma",       status: "PAID",    paidAt: date(2026, 3, 3),  paymentMethod: PM.T },
+    { student: "Gala",      status: "PAID",    paidAt: date(2026, 3, 2),  paymentMethod: PM.E },
+    { student: "Mora",      status: "PAID",    paidAt: date(2026, 3, 4),  paymentMethod: PM.T },
+    { student: "India",     status: "PAID",    paidAt: date(2026, 3, 1),  paymentMethod: PM.C },
+  ]
+
+  let paymentCount2 = 0
+  for (const entry of gym2March) {
+    const student = students2.find((s) => s.firstName === entry.student)!
+    await db.payment.create({
+      data: {
+        gymId: gym2.id,
+        studentId: student.id,
+        period: firstOfMonth(2026, 3),
+        amount: monthlyAmounts2[student.id],
+        status: entry.status,
+        paidAt: entry.paidAt,
+        paymentMethod: entry.paymentMethod,
+      },
+    })
+    paymentCount2++
+  }
+
+  console.log(`Gym2 Payments: ${paymentCount2} (Mar 2026)`)
 
   // ── Summary ────────────────────────────────────────────────────────────────
 
   console.log(`
-📋 Resumen
-   Gym ID:      ${gym.id}
-   Login:       admin@gym360.com / admin1234
+Resumen GYM360 Central (${gym.id}):
+  Grupos: 5 | Alumnos: ${students.length} | Gastos fijos: $180k
+  Pagos: ${paymentCount} (Ene-Mar) | Margenes negativos en varios grupos
 
-   Grupos (5):
-     Principiantes ($15k, L-M-V 10:00-11:30)
-     Intermedio ($18k, Ma-Ju 17:00-19:00)
-     Avanzado ($22k, L-V 08:00-10:00)
-     Competición ($28k, L-V 15:00-18:00)
-     Baby Gym ($10k, Sáb 09:00-10:30)
+Resumen GYM360 Palermo (${gym2.id}):
+  Grupos: 3 | Alumnos: ${students2.length} | Gastos fijos: $103k
+  Pagos: ${paymentCount2} (Mar) | Gym rentable, margenes positivos
+  Iniciacion: 12 alumnos x $25k, prof $2.5k/h
+  Formativo:  10 alumnos x $32k, prof $3k/h
+  Elite:       7 alumnos x $45k, prof $3.5k/h
 
-   Entrenadores (4):
-     Laura: Principiantes completo + Competición L-M-V 15:00-17:00
-     Marcelo: Intermedio completo + Avanzado completo + Competición Ma-Ju completo
-     Gabriela: Competición L-M-V 17:00-18:00 + Baby Gym Sáb 09:00-09:45 (parcial!)
-     Nicolás: INACTIVO
-
-   Cobertura interesante:
-     Competición L-M-V: Laura 15-17h + Gabriela 17-18h = cubierto
-     Competición Ma-Ju: Marcelo 15-18h = cubierto
-     Baby Gym Sáb: Gabriela 09:00-09:45 = parcial (falta 09:45-10:30)
-
-   Alumnos: 16 activos + 1 baja (Diego)
-   Gastos fijos: $180.000/mes
-   Pagos: Enero · Febrero · Marzo (46 registros)
-
-   👉 Probá las métricas con period=2026-01, 2026-02 o 2026-03
+Login: admin@gym360.com / admin1234
   `)
 }
 

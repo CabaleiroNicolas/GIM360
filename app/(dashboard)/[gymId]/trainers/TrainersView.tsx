@@ -202,7 +202,7 @@ export default function TrainersView({ gymId }: { gymId: string }) {
       if (schedules.length > 0) {
         const assignRes = await fetch(`/api/groups/${assignForm.groupId}/trainers?gymId=${gymId}`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ trainerId: created.id, hourlyRate: Number(assignForm.hourlyRate), schedules }),
+          body: JSON.stringify({ trainerId: created.id, hourlyRate: Number(assignForm.hourlyRate), schedules, forceOverlap: true }),
         })
         if (!assignRes.ok) {
           setFormError("Entrenador creado, pero no se pudo asignar al grupo.")

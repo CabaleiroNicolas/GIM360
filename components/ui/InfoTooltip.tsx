@@ -49,7 +49,7 @@ export function InfoTooltip({ text }: { text: string }) {
         <div
           ref={tooltipRef}
           style={{ position: "fixed", top: pos.top, left: pos.left, transform: "translateX(-50%)" }}
-          className="w-56 rounded-lg bg-[#111110] px-3 py-2 text-[11px] font-normal normal-case tracking-normal text-white shadow-lg z-[9999] text-left leading-relaxed"
+          className="w-64 rounded-lg bg-[#111110] px-3 py-2.5 text-[11px] font-normal normal-case tracking-normal text-white shadow-lg z-[9999] text-left leading-relaxed whitespace-pre-line"
         >
           {text}
         </div>,

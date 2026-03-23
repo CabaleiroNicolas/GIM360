@@ -32,7 +32,7 @@ export type GymMetrics = {
   period: string
   /** Sum of all PAID payment amounts for the gym in the period */
   totalCollectedRevenue: number
-  /** Sum of all PENDING payment amounts for the gym in the period */
+  /** Sum of all PENDING + EXPIRED payment amounts for the gym in the period */
   totalPendingRevenue: number
   /** Trainer cost: Σ hourlyRate × (actualMinutes / 60) per active trainer per group */
   totalTrainerCost: number
@@ -59,7 +59,7 @@ export async function getGymMetrics(input: MetricsQueryInput): Promise<GymMetric
     }),
 
     db.payment.aggregate({
-      where: { gymId: input.gymId, period: periodDate, status: "PENDING" },
+      where: { gymId: input.gymId, period: periodDate, status: { in: ["PENDING", "EXPIRED"] } },
       _sum: { amount: true },
     }),
 
