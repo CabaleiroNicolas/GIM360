@@ -9,12 +9,12 @@
 
 | Severidad | Cantidad | Estado requerido |
 |-----------|----------|------------------|
-| CRITICA   | 6        | Corregir antes de produccion |
-| ALTA      | 11       | Corregir antes de produccion |
-| MEDIA     | 14       | Planificar correccion |
+| CRITICA   | 2        | Corregir antes de produccion |
+| ALTA      | 3        | Corregir antes de produccion |
+| MEDIA     | 11       | Planificar correccion |
 | BAJA      | 10       | Mejora futura |
 
-**Total: 41 hallazgos**
+**Total: 26 hallazgos** *(13 resueltos desde auditoría inicial)*
 
 ---
 
@@ -32,42 +32,9 @@
 - **Impacto:** Acceso total a la base de datos y storage de Supabase.
 - **Solucion:** Verificar que `.env.local` esta en `.gitignore`, rotar todas las credenciales, usar variables de entorno del hosting.
 
-### SEC-03 — Bypass de autorizacion en PATCH /api/payments/[id]
-- **Archivo:** `app/api/payments/[id]/route.ts` ~linea 11
-- **Descripcion:** El endpoint PATCH permite roles OWNER y RECEPTIONIST pero NO verifica `gymBelongsToOwner`. Solo verifica `paymentBelongsToGym`. Un RECEPTIONIST de un gimnasio puede modificar pagos de CUALQUIER gimnasio conociendo el gymId.
-- **Impacto:** Rotura de aislamiento multi-tenant. Modificacion de pagos entre gimnasios.
-- **Solucion:** Agregar `gymBelongsToOwner(gymId, session.user.id)` antes del belongs check.
-
-### SEC-04 — Bypass de autorizacion en DELETE /api/payments/[id]
-- **Archivo:** `app/api/payments/[id]/route.ts` ~linea 45
-- **Descripcion:** Mismo problema que SEC-03 pero para eliminacion. Un OWNER puede eliminar pagos de cualquier gimnasio.
-- **Impacto:** Eliminacion de datos financieros de otros gimnasios.
-- **Solucion:** Agregar `gymBelongsToOwner` check.
-
-### SEC-05 — Bypass de autorizacion en GET /api/cash-closings/[id]
-- **Archivo:** `app/api/cash-closings/[id]/route.ts` ~linea 9
-- **Descripcion:** Solo verifica `cashClosingBelongsToGym`, no `gymBelongsToOwner`. Permite acceso a datos financieros de cierres de caja de otros gimnasios.
-- **Impacto:** Lectura no autorizada de informacion financiera sensible.
-- **Solucion:** Agregar `gymBelongsToOwner` check.
-
-### DB-01 — Cascadas de eliminacion faltantes en schema
-- **Archivo:** `prisma/schema.prisma`
-- **Descripcion:** Multiples relaciones FK no tienen `onDelete: Cascade`:
-  - `Trainer.gym`, `Student.gym`, `Group.gym` — eliminar un gimnasio deja entidades huerfanas
-  - `Schedule.group` — eliminar un grupo deja horarios huerfanos
-  - `TrainerGroup.trainer/group`, `StudentGroup.student/group` — tablas de juncion sin cascada
-- **Impacto:** La eliminacion de gimnasios/grupos/alumnos fallara con errores de constraint FK en produccion.
-- **Solucion:** Agregar `onDelete: Cascade` en todas las relaciones que correspondan, o `onDelete: Restrict` donde la eliminacion debe fallar explicitamente.
-
 ---
 
 ## ALTA (Corregir antes de produccion)
-
-### SEC-06 — Sin headers de seguridad HTTP
-- **Archivo:** `next.config.ts`
-- **Descripcion:** No hay headers de seguridad configurados: sin CSP, X-Frame-Options, X-Content-Type-Options, HSTS, Referrer-Policy.
-- **Impacto:** Vulnerable a XSS, clickjacking, MIME sniffing.
-- **Solucion:** Agregar headers en `next.config.ts` o middleware.
 
 ### SEC-07 — Sin rate limiting en API
 - **Archivos:** Todos los route handlers en `app/api/`
@@ -75,53 +42,11 @@
 - **Impacto:** Ataques de fuerza bruta, DoS, extraccion masiva de datos.
 - **Solucion:** Implementar rate limiting con Upstash Redis o middleware similar.
 
-### SEC-08 — Sin configuracion CORS
-- **Archivo:** `next.config.ts`
-- **Descripcion:** No hay politica CORS. Cualquier sitio web puede hacer requests a la API usando las cookies de sesion.
-- **Impacto:** Cross-site request forgery facilitado.
-- **Solucion:** Configurar CORS restringido al dominio de la app.
-
-### SEC-09 — Bcrypt con cost factor bajo
-- **Archivos:** `lib/auth.ts`, `scripts/seed.ts`, `scripts/seed-dev.ts`
-- **Descripcion:** `bcrypt.hash(password, 10)` usa factor de costo 10. El estandar minimo para produccion es 12.
-- **Impacto:** Hashing mas rapido facilita ataques de diccionario.
-- **Solucion:** Subir a `bcrypt.hash(password, 12)`.
-
 ### SEC-10 — Credenciales hardcodeadas en scripts de seed
 - **Archivos:** `scripts/seed.ts`, `scripts/seed-dev.ts`
-- **Descripcion:** Email y password en texto plano (`admin@gym360.com / admin1234`). Si el seed se ejecuta en produccion, existen credenciales conocidas.
-- **Impacto:** Acceso no autorizado con credenciales default.
-- **Solucion:** Documentar como dev-only, usar variables de entorno, agregar guard de NODE_ENV.
-
-### BUG-01 — Inconsistencia de timezone en pagos
-- **Archivo:** `modules/payments/payments.service.ts` ~lineas 10, 75
-- **Descripcion:** `parsePeriod()` crea fechas en UTC (`Date.UTC`), pero `expireOverduePayments()` crea fechas en timezone local (`new Date(year, month-1, ...)`). En servidores con timezone != UTC, las cuotas pueden vencer o no vencer incorrectamente.
-- **Impacto:** Pagos vencen en el momento incorrecto dependiendo del timezone del servidor.
-- **Solucion:** Usar UTC consistentemente en todas las operaciones de fecha.
-
-### BUG-02 — Aritmetica de punto flotante en montos
-- **Archivos:** `modules/cash-closings/cash-closings.service.ts` ~linea 24, `modules/metrics/gym/gym-metrics.service.ts` ~lineas 85-90
-- **Descripcion:** Los montos Prisma `Decimal(10,2)` se convierten a `Number` con `Number(p.amount)` y se acumulan con `reduce()`. La aritmetica de punto flotante pierde precision.
-- **Impacto:** Discrepancias en totales financieros (ej: 100 pagos de $0.10 = $9.999... en vez de $10.00).
-- **Solucion:** Usar una libreria de precision decimal (decimal.js) o acumular en centavos (integers).
-
-### BUG-03 — Fetch sin manejo de errores en todas las vistas
-- **Archivos:** `PaymentsView.tsx`, `StudentsView.tsx`, `MetricsView.tsx`, `GroupsView.tsx`, `TrainersView.tsx`, `ExpensesView.tsx`, `dashboard/page.tsx`
-- **Descripcion:** Multiples llamadas `fetch()` no tienen `.catch()` ni manejan respuestas de error. Si la API falla, el error se traga silenciosamente. El usuario ve un spinner infinito o datos vacios sin explicacion.
-- **Impacto:** UX degradada, imposible diagnosticar problemas. Datos pueden quedar en estado inconsistente.
-- **Solucion:** Agregar manejo de errores en todas las llamadas fetch con estado de error visible al usuario.
-
-### BUG-04 — Race conditions en fetch con useEffect
-- **Archivo:** `app/(dashboard)/[gymId]/groups/[groupId]/GroupDetailView.tsx` ~linea 64
-- **Descripcion:** Si el componente se desmonta mientras un fetch esta pendiente, `setState` se ejecuta sobre un componente desmontado. Falta cleanup con AbortController.
-- **Impacto:** Memory leaks, warnings de React en consola.
-- **Solucion:** Usar AbortController en useEffect para cancelar fetchs pendientes al desmontar.
-
-### BUG-05 — Mutaciones silenciosas en pagos
-- **Archivo:** `app/(dashboard)/[gymId]/payments/PaymentsView.tsx` ~linea 156
-- **Descripcion:** `handleMarkPaid` y `handleUnmarkPaid` llaman a la API pero si falla, `setUpdatingId(null)` se ejecuta igual sin mostrar error. El usuario cree que la accion fue exitosa.
-- **Impacto:** El usuario marca un pago como pagado, la UI se actualiza pero la DB no. Inconsistencia de datos.
-- **Solucion:** Agregar manejo de errores y toast/alerta cuando la mutacion falla.
+- **Descripcion:** Email y password en texto plano (`admin@gym360.com / admin1234`). El guard de `NODE_ENV === "production"` fue agregado, pero las credenciales siguen hardcodeadas en codigo fuente.
+- **Impacto:** Si el seed se ejecuta en produccion por error, existen credenciales conocidas en el sistema.
+- **Solucion:** Leer email/password desde variables de entorno en lugar de hardcodearlos.
 
 ### DEPLOY-01 — Sin configuracion de deployment
 - **Archivo:** Raiz del proyecto
@@ -140,7 +65,7 @@
 
 ### SEC-12 — Rol RECEPTIONIST sin modelo de asignacion a gimnasio
 - **Archivos:** Route handlers de payments
-- **Descripcion:** RECEPTIONIST puede acceder a pagos con `gymBelongsToOwner`, pero el modelo no tiene concepto de a que gimnasio pertenece un receptionist. El check es contra el owner, no contra el receptionist.
+- **Descripcion:** RECEPTIONIST puede acceder a pagos con `gymBelongsToUser`, pero el modelo no tiene concepto de a que gimnasio pertenece un receptionist. El check es contra el owner, no contra el receptionist.
 - **Solucion:** Definir modelo de asignacion gym-receptionist o usar belongs check especifico.
 
 ### PERF-01 — Sin paginacion en endpoints de listado
@@ -164,16 +89,6 @@
 - **Descripcion:** Carga todos los grupos con relaciones anidadas y todos los pagos en memoria. Para gimnasios grandes, esto es ineficiente.
 - **Solucion:** Usar agregaciones SQL o queries mas selectivas.
 
-### UX-01 — Sin skeleton loaders
-- **Archivos:** Todas las vistas
-- **Descripcion:** Las vistas muestran "Cargando..." generico. Sin skeleton screens que den feedback visual de la estructura de la pagina.
-- **Solucion:** Implementar skeleton loaders para tablas y cards.
-
-### UX-02 — Sin error boundaries por seccion
-- **Archivos:** Todas las vistas bajo `app/(dashboard)/`
-- **Descripcion:** Si un componente crashea, se cae toda la vista. Solo existe error.tsx global.
-- **Solucion:** Agregar error boundaries por seccion critica o por vista.
-
 ### UX-03 — Mensajes de error inconsistentes
 - **Archivos:** Multiples vistas
 - **Descripcion:** Los mensajes de error varian en tono y especificidad: "No se pudieron cargar los gastos" vs "Error al crear el gasto" vs "Error de conexion". El usuario no puede distinguir el tipo de error.
@@ -184,11 +99,6 @@
 - **Descripcion:** Botones de accion en tablas tienen altura de ~24px. WCAG AA requiere minimo 44px.
 - **Solucion:** Agregar padding minimo a botones interactivos en tablas.
 
-### UX-05 — Tablas sin indicador de scroll horizontal en mobile
-- **Archivo:** `components/ui/DataTable.tsx`
-- **Descripcion:** Las tablas tienen `overflow-x-auto` pero ningun indicador visual de que hay mas contenido. En mobile, los usuarios pueden no descubrir columnas ocultas.
-- **Solucion:** Agregar sombra/gradiente en el borde derecho cuando hay scroll disponible.
-
 ### DB-02 — Sin validacion de precision decimal en Zod
 - **Archivo:** `modules/payments/payments.schema.ts`
 - **Descripcion:** Montos usan `z.number().positive()` sin limitar decimales. El frontend puede enviar `1.999999` que la DB trunca silenciosamente.
@@ -196,8 +106,8 @@
 
 ### DB-03 — Inconsistencia de idioma en enums
 - **Archivo:** `prisma/schema.prisma`
-- **Descripcion:** Algunos enums usan ingles (`PENDING`, `PAID`, `EXPIRED`, `MONDAY`-`SUNDAY`) y otros espanol (`ACTIVO`, `INACTIVO`, `PRUEBA`, `EFECTIVO`, `TRANSFERENCIA`). Confuso para desarrolladores.
-- **Solucion:** Estandarizar en un solo idioma (preferiblemente ingles para enums).
+- **Descripcion:** `GymStatus` fue migrado a ingles (`ACTIVE`, `INACTIVE`, `SUSPENDED`), pero `StudentStatus` (`ACTIVO`, `INACTIVO`, `PRUEBA`) y `PaymentMethod` (`EFECTIVO`, `TRANSFERENCIA`, `TARJETA`) siguen en espanol.
+- **Solucion:** Completar la estandarizacion al ingles en los enums restantes.
 
 ### LOG-01 — Sin logging estructurado ni audit trail
 - **Archivos:** Todos los route handlers
@@ -266,29 +176,23 @@
 ### Fase 1 — Seguridad critica (antes de produccion)
 1. Rotar credenciales de Supabase y DB
 2. Generar AUTH_SECRET seguro
-3. Corregir bypasses de autorizacion (SEC-03, SEC-04, SEC-05)
-4. Agregar cascadas en schema Prisma
-5. Agregar headers de seguridad
-6. Configurar CORS
-7. Implementar rate limiting
+3. Implementar rate limiting
+4. Mover credenciales de seed a variables de entorno
 
 ### Fase 2 — Estabilidad (primera semana)
-1. Corregir timezone inconsistency en pagos
-2. Corregir aritmetica de punto flotante en montos
-3. Agregar manejo de errores en todos los fetch del frontend
-4. Agregar AbortController en useEffects con fetch
-5. Agregar feedback visual cuando mutaciones fallan
+1. Configurar CI/CD pipeline
+2. Agregar Vitest + primeros tests (auth, belongs, payments)
+3. Implementar logging estructurado
 
 ### Fase 3 — Calidad (primeras dos semanas)
 1. Implementar paginacion en API
 2. Agregar debounce en busquedas
-3. Configurar CI/CD pipeline
-4. Agregar Vitest + primeros tests (auth, belongs, payments)
-5. Implementar logging estructurado
+3. Memoizacion de datos derivados
+4. Completar estandarizacion de enums al ingles (DB-03)
+5. Validacion de precision decimal en Zod (DB-02)
 
 ### Fase 4 — Mejoras continuas
-1. Skeleton loaders
-2. Error boundaries por seccion
-3. Memoizacion de datos derivados
-4. Versionado de API
-5. Estandarizacion de enums y mensajes de error
+1. Estandarizacion de mensajes de error
+2. Versionado de API
+3. Modelo de asignacion gym-receptionist
+4. Touch targets mobile (WCAG)

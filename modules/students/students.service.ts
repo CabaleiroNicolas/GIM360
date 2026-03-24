@@ -49,15 +49,15 @@ export async function updateStudent(id: string, data: UpdateStudentInput) {
 }
 
 export async function deactivateStudent(id: string) {
-  return db.student.update({ where: { id }, data: { status: "INACTIVO", leftAt: new Date() } })
+  return db.student.update({ where: { id }, data: { status: "INACTIVE", leftAt: new Date() } })
 }
 
 export async function activateStudent(id: string) {
-  return db.student.update({ where: { id }, data: { status: "ACTIVO", leftAt: null } })
+  return db.student.update({ where: { id }, data: { status: "ACTIVE", leftAt: null } })
 }
 
 export async function startTrial(id: string, trialEndsAt: Date) {
-  return db.student.update({ where: { id }, data: { status: "PRUEBA", trialEndsAt } })
+  return db.student.update({ where: { id }, data: { status: "TRIAL", trialEndsAt } })
 }
 
 export async function deleteStudent(id: string) {

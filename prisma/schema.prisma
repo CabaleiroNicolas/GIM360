@@ -43,15 +43,15 @@ enum StudentFileType {
 }
 
 enum StudentStatus {
-  ACTIVO
-  INACTIVO
-  PRUEBA
+  ACTIVE
+  INACTIVE
+  TRIAL
 }
 
 enum PaymentMethod {
-  EFECTIVO
-  TRANSFERENCIA
-  TARJETA
+  CASH
+  TRANSFER
+  CARD
 }
 
 // ─── Modelos ─────────────────────────────────────────────────────────────────
@@ -140,7 +140,7 @@ model Student {
   emergencyContact     String?
   joinedAt             DateTime         @default(now())
   leftAt               DateTime?
-  status               StudentStatus    @default(ACTIVO)
+  status               StudentStatus    @default(ACTIVE)
   trialEndsAt          DateTime?
   dueDay               Int              @default(1)
   createdAt            DateTime         @default(now())
@@ -270,12 +270,12 @@ model CashClosing {
   closedAt           DateTime @default(now())
   totalCollected     Decimal  @db.Decimal(10, 2)
   paidCount          Int
-  efectivoCount      Int      @default(0)
-  efectivoTotal      Decimal  @db.Decimal(10, 2) @default(0)
-  transferenciaCount Int      @default(0)
-  transferenciaTotal Decimal  @db.Decimal(10, 2) @default(0)
-  tarjetaCount       Int      @default(0)
-  tarjetaTotal       Decimal  @db.Decimal(10, 2) @default(0)
+  cashCount          Int      @default(0)
+  cashTotal          Decimal  @db.Decimal(10, 2) @default(0)
+  transferCount      Int      @default(0)
+  transferTotal      Decimal  @db.Decimal(10, 2) @default(0)
+  cardCount          Int      @default(0)
+  cardTotal          Decimal  @db.Decimal(10, 2) @default(0)
   notes              String?
   createdAt          DateTime @default(now())
 

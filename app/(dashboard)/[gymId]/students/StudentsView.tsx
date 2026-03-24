@@ -18,10 +18,10 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type StudentStatus = "ACTIVO" | "INACTIVO" | "PRUEBA"
+type StudentStatus = "ACTIVE" | "INACTIVE" | "TRIAL"
 type StudentFileType = "FICHA" | "APTO_MEDICO"
 type PaymentStatus = "PENDING" | "PAID" | "EXPIRED"
-type PaymentMethod = "EFECTIVO" | "TRANSFERENCIA" | "TARJETA"
+type PaymentMethod = "CASH" | "TRANSFER" | "CARD"
 
 type StudentPayment = {
   id: string
@@ -175,13 +175,13 @@ export default function StudentsView({ gymId }: { gymId: string }) {
   const [confirmFileId, setConfirmFileId] = useState<string | null>(null)
 
   // ─── Derived counts ────────────────────────────────────────────────────────
-  const countActivo = students.filter((s) => s.status === "ACTIVO").length
-  const countPrueba = students.filter((s) => s.status === "PRUEBA").length
-  const countInactivo = students.filter((s) => s.status === "INACTIVO").length
+  const countActivo = students.filter((s) => s.status === "ACTIVE").length
+  const countPrueba = students.filter((s) => s.status === "TRIAL").length
+  const countInactivo = students.filter((s) => s.status === "INACTIVE").length
 
   // ─── Filtering & sorting ───────────────────────────────────────────────────
   const base = filter === "ACTIVOS"
-    ? students.filter((s) => s.status !== "INACTIVO")
+    ? students.filter((s) => s.status !== "INACTIVE")
     : students
 
   const displayed = base
@@ -335,7 +335,7 @@ export default function StudentsView({ gymId }: { gymId: string }) {
     setReactivating(true)
     const res = await fetch(`/api/students/${selectedDetail.id}?gymId=${gymId}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "ACTIVO" }),
+      body: JSON.stringify({ status: "ACTIVE" }),
     })
     if (res.ok) {
       const [updated] = await Promise.all([
@@ -365,7 +365,7 @@ export default function StudentsView({ gymId }: { gymId: string }) {
     }
     if (form.phone2.trim()) body.phone2 = form.phone2.trim()
     if (form.isTrial) {
-      body.status = "PRUEBA"
+      body.status = "TRIAL"
       body.trialEndsAt = new Date(form.trialEndsAt).toISOString()
     }
 
@@ -420,20 +420,20 @@ export default function StudentsView({ gymId }: { gymId: string }) {
   // ─── Status helpers ────────────────────────────────────────────────────────
 
   function statusLabel(status: StudentStatus) {
-    if (status === "ACTIVO") return "Activo"
-    if (status === "PRUEBA") return "Prueba"
+    if (status === "ACTIVE") return "Activo"
+    if (status === "TRIAL") return "Prueba"
     return "Baja"
   }
 
   function statusDotColor(status: StudentStatus) {
-    if (status === "ACTIVO") return "bg-emerald-500"
-    if (status === "PRUEBA") return "bg-amber-500"
+    if (status === "ACTIVE") return "bg-emerald-500"
+    if (status === "TRIAL") return "bg-amber-500"
     return "bg-red-500"
   }
 
   function statusTextColor(status: StudentStatus) {
-    if (status === "ACTIVO") return "text-emerald-700"
-    if (status === "PRUEBA") return "text-amber-700"
+    if (status === "ACTIVE") return "text-emerald-700"
+    if (status === "TRIAL") return "text-amber-700"
     return "text-red-700"
   }
 
@@ -581,20 +581,20 @@ export default function StudentsView({ gymId }: { gymId: string }) {
         columns={[
           { key: "name", header: "Nombre", render: (s) => (
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`font-medium ${s.status !== "INACTIVO" ? "text-[#111110]" : "text-[#A5A49D]"}`}>
+              <span className={`font-medium ${s.status !== "INACTIVE" ? "text-[#111110]" : "text-[#A5A49D]"}`}>
                 {s.firstName} {s.lastName}
               </span>
-              {s.status === "PRUEBA" && (
+              {s.status === "TRIAL" && (
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
                   Prueba
                 </span>
               )}
-              {s.status === "INACTIVO" && (
+              {s.status === "INACTIVE" && (
                 <span className="text-[10px] uppercase tracking-wider text-[#A5A49D] bg-[#F7F6F3] px-1.5 py-0.5 rounded">
                   Baja
                 </span>
               )}
-              {s.status === "PRUEBA" && s.trialEndsAt && (
+              {s.status === "TRIAL" && s.trialEndsAt && (
                 <span className="text-[10px] text-[#A5A49D]">hasta {fmtDate(s.trialEndsAt)}</span>
               )}
             </div>
@@ -648,10 +648,10 @@ export default function StudentsView({ gymId }: { gymId: string }) {
                   {/* ── Acciones ─────────────────────────────────────────── */}
                   <div className="flex flex-wrap items-center gap-3">
                     <Button variant="secondary" onClick={startEdit}>Editar</Button>
-                    {selectedDetail.status !== "INACTIVO" && (
+                    {selectedDetail.status !== "INACTIVE" && (
                       <Button variant="danger" onClick={() => setConfirmId(selectedDetail.id)}>Dar de baja</Button>
                     )}
-                    {selectedDetail.status === "INACTIVO" && (
+                    {selectedDetail.status === "INACTIVE" && (
                       <Button
                         variant="primary"
                         onClick={handleReactivate}
@@ -675,12 +675,12 @@ export default function StudentsView({ gymId }: { gymId: string }) {
                             label={statusLabel(selectedDetail.status)}
                           />
                         </div>
-                        {selectedDetail.status === "PRUEBA" && selectedDetail.trialEndsAt && (
+                        {selectedDetail.status === "TRIAL" && selectedDetail.trialEndsAt && (
                           <p className="mt-1 text-xs text-amber-700">
                             Prueba hasta {fmtDate(selectedDetail.trialEndsAt)}
                           </p>
                         )}
-                        {selectedDetail.status === "INACTIVO" && selectedDetail.leftAt && (
+                        {selectedDetail.status === "INACTIVE" && selectedDetail.leftAt && (
                           <p className="mt-1 text-xs text-[#A5A49D]">
                             Baja desde {fmtDate(selectedDetail.leftAt)}
                           </p>
@@ -803,7 +803,7 @@ export default function StudentsView({ gymId }: { gymId: string }) {
                             PAID: "Pagado", PENDING: "Pendiente", EXPIRED: "Vencido",
                           }
                           const methodLabels: Record<PaymentMethod, string> = {
-                            EFECTIVO: "Efectivo", TRANSFERENCIA: "Transferencia", TARJETA: "Tarjeta",
+                            CASH: "Efectivo", TRANSFER: "Transferencia", CARD: "Tarjeta",
                           }
                           return (
                             <div

@@ -25,25 +25,25 @@ export async function createCashClosing(input: CreateCashClosingInput) {
 
     const totalCollected = round2(paidPayments.reduce((sum, p) => sum + Number(p.amount), 0))
 
-    let efectivoCount = 0, efectivoTotal = 0
-    let transferenciaCount = 0, transferenciaTotal = 0
-    let tarjetaCount = 0, tarjetaTotal = 0
+    let cashCount = 0, cashTotal = 0
+    let transferCount = 0, transferTotal = 0
+    let cardCount = 0, cardTotal = 0
 
     for (const p of paidPayments) {
       const amount = Number(p.amount)
       switch (p.paymentMethod) {
-        case "EFECTIVO":
-          efectivoCount++; efectivoTotal += amount; break
-        case "TRANSFERENCIA":
-          transferenciaCount++; transferenciaTotal += amount; break
-        case "TARJETA":
-          tarjetaCount++; tarjetaTotal += amount; break
+        case "CASH":
+          cashCount++; cashTotal += amount; break
+        case "TRANSFER":
+          transferCount++; transferTotal += amount; break
+        case "CARD":
+          cardCount++; cardTotal += amount; break
       }
     }
 
-    efectivoTotal = round2(efectivoTotal)
-    transferenciaTotal = round2(transferenciaTotal)
-    tarjetaTotal = round2(tarjetaTotal)
+    cashTotal = round2(cashTotal)
+    transferTotal = round2(transferTotal)
+    cardTotal = round2(cardTotal)
 
     const fromDate = paidPayments[0].paidAt!
     const toDate = paidPayments[paidPayments.length - 1].paidAt!
@@ -55,12 +55,12 @@ export async function createCashClosing(input: CreateCashClosingInput) {
         toDate,
         totalCollected,
         paidCount: paidPayments.length,
-        efectivoCount,
-        efectivoTotal,
-        transferenciaCount,
-        transferenciaTotal,
-        tarjetaCount,
-        tarjetaTotal,
+        cashCount,
+        cashTotal,
+        transferCount,
+        transferTotal,
+        cardCount,
+        cardTotal,
         notes: input.notes,
       },
     })

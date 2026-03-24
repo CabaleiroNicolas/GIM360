@@ -30,7 +30,7 @@ export async function generateMonthlyPayments(gymId: string, period: string) {
   const students = await db.student.findMany({
     where: {
       gymId,
-      status: { in: ["ACTIVO", "PRUEBA"] },
+      status: { in: ["ACTIVE", "TRIAL"] },
       groups: { some: {} },
     },
     include: {

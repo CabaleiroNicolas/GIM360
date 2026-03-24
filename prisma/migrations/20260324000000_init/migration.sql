@@ -1,3 +1,6 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
 CREATE TYPE "UserRole" AS ENUM ('OWNER', 'TRAINER', 'RECEPTIONIST');
 
@@ -14,10 +17,10 @@ CREATE TYPE "PaymentStatus" AS ENUM ('PENDING', 'PAID', 'EXPIRED');
 CREATE TYPE "StudentFileType" AS ENUM ('FICHA', 'APTO_MEDICO');
 
 -- CreateEnum
-CREATE TYPE "StudentStatus" AS ENUM ('ACTIVO', 'INACTIVO', 'PRUEBA');
+CREATE TYPE "StudentStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'TRIAL');
 
 -- CreateEnum
-CREATE TYPE "PaymentMethod" AS ENUM ('EFECTIVO', 'TRANSFERENCIA', 'TARJETA');
+CREATE TYPE "PaymentMethod" AS ENUM ('CASH', 'TRANSFER', 'CARD');
 
 -- CreateTable
 CREATE TABLE "User" (
@@ -92,7 +95,7 @@ CREATE TABLE "Student" (
     "emergencyContact" TEXT,
     "joinedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "leftAt" TIMESTAMP(3),
-    "status" "StudentStatus" NOT NULL DEFAULT 'ACTIVO',
+    "status" "StudentStatus" NOT NULL DEFAULT 'ACTIVE',
     "trialEndsAt" TIMESTAMP(3),
     "dueDay" INTEGER NOT NULL DEFAULT 1,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -201,12 +204,12 @@ CREATE TABLE "CashClosing" (
     "closedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "totalCollected" DECIMAL(10,2) NOT NULL,
     "paidCount" INTEGER NOT NULL,
-    "efectivoCount" INTEGER NOT NULL DEFAULT 0,
-    "efectivoTotal" DECIMAL(10,2) NOT NULL DEFAULT 0,
-    "transferenciaCount" INTEGER NOT NULL DEFAULT 0,
-    "transferenciaTotal" DECIMAL(10,2) NOT NULL DEFAULT 0,
-    "tarjetaCount" INTEGER NOT NULL DEFAULT 0,
-    "tarjetaTotal" DECIMAL(10,2) NOT NULL DEFAULT 0,
+    "cashCount" INTEGER NOT NULL DEFAULT 0,
+    "cashTotal" DECIMAL(10,2) NOT NULL DEFAULT 0,
+    "transferCount" INTEGER NOT NULL DEFAULT 0,
+    "transferTotal" DECIMAL(10,2) NOT NULL DEFAULT 0,
+    "cardCount" INTEGER NOT NULL DEFAULT 0,
+    "cardTotal" DECIMAL(10,2) NOT NULL DEFAULT 0,
     "notes" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 

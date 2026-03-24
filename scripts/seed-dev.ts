@@ -23,7 +23,7 @@ function date(year: number, month: number, day: number) {
   return new Date(Date.UTC(year, month - 1, day))
 }
 
-const PM = { E: "EFECTIVO", T: "TRANSFERENCIA", C: "TARJETA" } as const
+const PM = { E: "CASH", T: "TRANSFER", C: "CARD" } as const
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -262,7 +262,7 @@ async function main() {
 
   type StudentSeed = {
     firstName: string; lastName: string; phone1: string; phone2?: string; nationalId?: string
-    birthDate?: Date; joinedAt: Date; leftAt?: Date; status?: "ACTIVO" | "INACTIVO" | "PRUEBA"
+    birthDate?: Date; joinedAt: Date; leftAt?: Date; status?: "ACTIVE" | "INACTIVE" | "TRIAL"
     trialEndsAt?: Date; dueDay: number; groups: string[]
   }
 
@@ -290,9 +290,9 @@ async function main() {
     { firstName: "Camila", lastName: "Torres", phone1: "1112345678", joinedAt: date(2025, 12, 8), dueDay: 8, groups: [gPrinc.id, gAvanz.id] },
     { firstName: "Emilia", lastName: "Suarez", phone1: "1123456780", nationalId: "39888999", joinedAt: date(2025, 10, 1), dueDay: 1, groups: [gAvanz.id, gCompe.id] },
     // Inactivo
-    { firstName: "Diego", lastName: "Morales", phone1: "1145678901", joinedAt: date(2025, 6, 1), leftAt: date(2026, 1, 31), status: "INACTIVO", dueDay: 1, groups: [gPrinc.id] },
+    { firstName: "Diego", lastName: "Morales", phone1: "1145678901", joinedAt: date(2025, 6, 1), leftAt: date(2026, 1, 31), status: "INACTIVE", dueDay: 1, groups: [gPrinc.id] },
     // Prueba
-    { firstName: "Renata", lastName: "Vidal", phone1: "1199887766", joinedAt: date(2026, 3, 10), status: "PRUEBA", trialEndsAt: date(2026, 4, 10), dueDay: 10, groups: [gPrinc.id] },
+    { firstName: "Renata", lastName: "Vidal", phone1: "1199887766", joinedAt: date(2026, 3, 10), status: "TRIAL", trialEndsAt: date(2026, 4, 10), dueDay: 10, groups: [gPrinc.id] },
   ]
 
   const students = await Promise.all(
@@ -312,11 +312,11 @@ async function main() {
     )
   )
 
-  console.log(`Students: ${students.length} (${students.filter(s => s.status === "ACTIVO").length} activos, 1 inactivo, 1 prueba)`)
+  console.log(`Students: ${students.length} (${students.filter(s => s.status === "ACTIVE").length} activos, 1 inactivo, 1 prueba)`)
 
   // ── Payments ───────────────────────────────────────────────────────────────
 
-  const activeStudents = students.filter((s) => s.status !== "INACTIVO")
+  const activeStudents = students.filter((s) => s.status !== "INACTIVE")
 
   // Compute each student's total monthly fee
   const monthlyAmounts: Record<string, number> = {}
@@ -332,7 +332,7 @@ async function main() {
     student: string
     status: "PAID" | "PENDING" | "EXPIRED"
     paidAt: Date | null
-    paymentMethod: "EFECTIVO" | "TRANSFERENCIA" | "TARJETA" | null
+    paymentMethod: "CASH" | "TRANSFER" | "CARD" | null
   }
 
   // January 2026 - closed month, almost all paid
