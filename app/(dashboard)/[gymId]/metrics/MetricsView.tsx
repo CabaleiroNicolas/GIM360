@@ -21,9 +21,22 @@ type GroupMetrics = {
   monthlyHours: number; trainerCost: number; margin: number; breakevenStudents: number | null
 }
 
-type MetricView = "gimnasio" | "grupos"
+type HealthIndexMetrics = {
+  score: number
+  label: "Saludable" | "En desarrollo" | "Con problemas" | "Crítico"
+  dim1Rentabilidad: { score: number; maxScore: number; weightedMarginPct: number }
+  dim2Ocupacion: {
+    score: number; maxScore: number; occupancyRate: number | null
+    totalStudents: number; totalCapacity: number; hasGroupsWithoutCapacity: boolean
+  }
+  dim3Eficiencia: { score: number; maxScore: number; costRatio: number }
+  dim4Ebitda: { score: number; maxScore: number; ebitdaMargin: number }
+}
+
+type MetricView = "optimizacion" | "gimnasio" | "grupos"
 
 const VIEWS: { id: MetricView; label: string }[] = [
+  { id: "optimizacion", label: "Optimización" },
   { id: "gimnasio", label: "Gimnasio" },
   { id: "grupos", label: "Grupos" },
 ]
@@ -93,6 +106,105 @@ function StackedBar({ segments }: { segments: { label: string; value: string; pc
             <span className="text-[#A5A49D]">({Math.round(s.pct)}%)</span>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Health Index View ────────────────────────────────────────────────────────
+
+function scoreColor(score: number): string {
+  if (score >= 80) return "#10b981"
+  if (score >= 60) return "#f59e0b"
+  if (score >= 40) return "#f97316"
+  return "#ef4444"
+}
+
+function labelDescription(label: HealthIndexMetrics["label"]): string {
+  switch (label) {
+    case "Saludable": return "El gimnasio opera con buena rentabilidad, alta ocupación y costos controlados."
+    case "En desarrollo": return "Hay margen de mejora en rentabilidad u ocupación. El gimnasio es viable pero puede optimizarse."
+    case "Con problemas": return "Algunas dimensiones presentan debilidades que afectan la salud financiera."
+    case "Crítico": return "El gimnasio tiene problemas financieros significativos que requieren atención urgente."
+  }
+}
+
+function DimCard({ name, score, maxScore, metric, tooltip }: {
+  name: string; score: number; maxScore: number; metric: string; tooltip: string
+}) {
+  const pct = maxScore > 0 ? (score / maxScore) * 100 : 0
+  const color = scoreColor(Math.round((score / maxScore) * 100))
+  return (
+    <div className="rounded-xl border border-[#E5E4E0] bg-white px-5 py-4 flex flex-col gap-2">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#A5A49D] flex items-center gap-1">
+        {name}
+        <InfoTooltip text={tooltip} />
+      </p>
+      <p className="font-bold font-mono text-2xl" style={{ color }}>
+        {score}<span className="text-base font-normal text-[#A5A49D]"> / {maxScore}</span>
+      </p>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-[#F0EFEB]">
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(Math.round(pct), 100)}%`, backgroundColor: color }} />
+      </div>
+      <p className="text-xs text-[#68685F]">{metric}</p>
+    </div>
+  )
+}
+
+function HealthIndexView({ health: h }: { health: HealthIndexMetrics }) {
+  const color = scoreColor(h.score)
+  return (
+    <div className="space-y-5">
+      <h2 className="text-base font-semibold text-[#111110]">Nivel de optimización del gimnasio</h2>
+
+      {/* Hero score */}
+      <div className="rounded-xl border border-[#E5E4E0] bg-white px-6 py-5 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex items-baseline gap-3">
+          <span className="text-5xl font-bold font-mono" style={{ color }}>{h.score}</span>
+          <span className="text-2xl text-[#A5A49D] font-mono">/ 100</span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="inline-block rounded-full px-3 py-0.5 text-xs font-semibold text-white w-fit" style={{ backgroundColor: color }}>
+            {h.label}
+          </span>
+          <p className="text-sm text-[#68685F] max-w-sm">{labelDescription(h.label)}</p>
+        </div>
+      </div>
+
+      {/* 4 dimension cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <DimCard
+          name="Rentabilidad"
+          score={h.dim1Rentabilidad.score}
+          maxScore={h.dim1Rentabilidad.maxScore}
+          metric={`Margen ponderado: ${Math.round(h.dim1Rentabilidad.weightedMarginPct * 100)}%`}
+          tooltip={`¿Cuánto queda de cada peso cobrado después de pagar a los profesores?\n\nUn margen alto significa que los grupos generan suficiente dinero para cubrir los sueldos y todavía sobra. Un margen bajo o negativo indica que los profesores cuestan más de lo que ingresa.\n\nSe pondera por ingresos: los grupos que más facturan tienen más peso en el resultado.\n\nEscalones:\n≥ 50% → 35 pts\n≥ 40% → 25 pts\n≥ 30% → 15 pts\n≥ 20% → 5 pts\n< 20% → 0 pts`}
+        />
+        <DimCard
+          name="Ocupación"
+          score={h.dim2Ocupacion.score}
+          maxScore={h.dim2Ocupacion.maxScore}
+          metric={
+            h.dim2Ocupacion.occupancyRate !== null
+              ? `Ocupación: ${Math.round(h.dim2Ocupacion.occupancyRate * 100)}% (${h.dim2Ocupacion.totalStudents} / ${h.dim2Ocupacion.totalCapacity} lugares)${h.dim2Ocupacion.hasGroupsWithoutCapacity ? " — algunos grupos sin capacidad" : ""}`
+              : "Sin grupos con capacidad máxima configurada"
+          }
+          tooltip={`¿Qué tan llenos están los grupos del gimnasio?\n\nCompara la cantidad de alumnos activos con la capacidad máxima de cada grupo. Un gimnasio con alta ocupación aprovecha mejor su infraestructura y sus profesores. Una ocupación baja significa que hay lugares disponibles que no generan ingresos.\n\nSe considera "óptimo" a partir del 90% de ocupación.\n\nFórmula: total de alumnos / total de lugares disponibles.${h.dim2Ocupacion.hasGroupsWithoutCapacity ? "\n\nNota: los grupos sin capacidad máxima configurada no se incluyen en este cálculo." : ""}`}
+        />
+        <DimCard
+          name="Eficiencia de costos"
+          score={h.dim3Eficiencia.score}
+          maxScore={h.dim3Eficiencia.maxScore}
+          metric={`Ratio de costos: ${Math.round(h.dim3Eficiencia.costRatio * 100)}% de lo cobrado`}
+          tooltip={`¿Qué parte de lo cobrado se va en gastos?\n\nSuma el costo de profesores más los gastos fijos (alquiler, servicios, etc.) y lo compara con el total cobrado. Un ratio bajo significa que el gimnasio gasta poco en relación a lo que ingresa — señal de buena eficiencia. Un ratio alto indica que casi todo lo que entra se va en costos.\n\nSe considera eficiente cuando los costos totales no superan el 55% de lo cobrado.`}
+        />
+        <DimCard
+          name="EBITDA"
+          score={h.dim4Ebitda.score}
+          maxScore={h.dim4Ebitda.maxScore}
+          metric={`Margen EBITDA: ${Math.round(h.dim4Ebitda.ebitdaMargin * 100)}%`}
+          tooltip={`¿Qué queda realmente en el gimnasio al final del mes?\n\nEs la ganancia neta: lo cobrado menos los profesores y todos los gastos fijos. Si es positivo, el gimnasio genera dinero. Si es negativo, está perdiendo plata cada mes.\n\nSe considera saludable un margen de al menos 30% sobre lo cobrado. Por ejemplo, si se cobraron $100.000 y el EBITDA es $30.000, el margen es del 30%.`}
+        />
       </div>
     </div>
   )
@@ -284,7 +396,8 @@ export default function MetricsView({ gymId }: { gymId: string }) {
   const maxPeriod = toYearMonth(now)
   const [period, setPeriod] = useState(maxPeriod)
   const [minPeriod, setMinPeriod] = useState<string | undefined>(undefined)
-  const [activeView, setActiveView] = useState<MetricView>("gimnasio")
+  const [activeView, setActiveView] = useState<MetricView>("optimizacion")
+  const [healthMetrics, setHealthMetrics] = useState<HealthIndexMetrics | null>(null)
   const [gymMetrics, setGymMetrics] = useState<GymMetrics | null>(null)
   const [groupMetrics, setGroupMetrics] = useState<GroupMetrics[]>([])
   const [selectedGroup, setSelectedGroup] = useState<GroupMetrics | null>(null)
@@ -311,12 +424,14 @@ export default function MetricsView({ gymId }: { gymId: string }) {
     setLoading(true); setError(null)
     try {
       const params = new URLSearchParams({ gymId, period })
-      const [gymRes, groupsRes] = await Promise.all([
-        fetch(`/api/metrics/gym?${params}`, { signal }), fetch(`/api/metrics/groups?${params}`, { signal }),
+      const [gymRes, groupsRes, healthRes] = await Promise.all([
+        fetch(`/api/metrics/gym?${params}`, { signal }),
+        fetch(`/api/metrics/groups?${params}`, { signal }),
+        fetch(`/api/metrics/health?${params}`, { signal }),
       ])
-      if (!gymRes.ok || !groupsRes.ok) { setError("No se pudieron cargar las métricas."); return }
-      const [gym, groups] = await Promise.all([gymRes.json(), groupsRes.json()])
-      setGymMetrics(gym); setGroupMetrics(groups)
+      if (!gymRes.ok || !groupsRes.ok || !healthRes.ok) { setError("No se pudieron cargar las métricas."); return }
+      const [gym, groups, health] = await Promise.all([gymRes.json(), groupsRes.json(), healthRes.json()])
+      setGymMetrics(gym); setGroupMetrics(groups); setHealthMetrics(health)
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return
       setError("Error de conexión. Intentá de nuevo.")
@@ -383,6 +498,11 @@ export default function MetricsView({ gymId }: { gymId: string }) {
         <SkeletonMetrics />
       ) : gymMetrics ? (
         <>
+          {/* ── OPTIMIZACIÓN ── */}
+          {activeView === "optimizacion" && healthMetrics && (
+            <HealthIndexView health={healthMetrics} />
+          )}
+
           {/* ── GIMNASIO ── */}
           {activeView === "gimnasio" && (
             <div className="space-y-5">
