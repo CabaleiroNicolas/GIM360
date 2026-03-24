@@ -128,7 +128,7 @@ export async function getGroupMetrics(input: MetricsQueryInput): Promise<GroupMe
     for (const sg of studentGroups) {
       const share =
         (Number(sg.group.monthlyPrice) / totalMonthlyPrice) * Number(payment.amount)
-      collectedByGroup.set(sg.group.id, (collectedByGroup.get(sg.group.id) ?? 0) + share)
+      collectedByGroup.set(sg.group.id, Math.round(((collectedByGroup.get(sg.group.id) ?? 0) + share) * 100) / 100)
     }
   }
 

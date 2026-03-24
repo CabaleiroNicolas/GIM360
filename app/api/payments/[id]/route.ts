@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { UserRole, PaymentMethod } from "@/app/generated/prisma/client"
 import { db } from "@/lib/db"
 import { withAuthParams } from "@/lib/with-auth"
-import { paymentBelongsToGym, gymIsActive } from "@/modules/belongs/belongs.service"
+import { paymentBelongsToGym, gymIsActive, gymBelongsToUser, gymBelongsToOwner } from "@/modules/belongs/belongs.service"
 import { updatePayment, deletePayment } from "@/modules/payments/payments.service"
 import { updatePaymentSchema } from "@/modules/payments/payments.schema"
 
@@ -12,6 +12,9 @@ export const PATCH = withAuthParams<Params>([UserRole.OWNER, UserRole.RECEPTIONI
   const gymId = req.nextUrl.searchParams.get("gymId")
   if (!gymId)
     return NextResponse.json({ error: "gymId required" }, { status: 400 })
+
+  if (!await gymBelongsToUser(gymId, session.user.id))
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   if (!await paymentBelongsToGym(id, gymId))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
@@ -46,6 +49,9 @@ export const DELETE = withAuthParams<Params>([UserRole.OWNER], async (req, sessi
   const gymId = req.nextUrl.searchParams.get("gymId")
   if (!gymId)
     return NextResponse.json({ error: "gymId required" }, { status: 400 })
+
+  if (!await gymBelongsToOwner(gymId, session.user.id))
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   if (!await paymentBelongsToGym(id, gymId))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })

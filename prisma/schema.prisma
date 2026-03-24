@@ -115,9 +115,10 @@ model Trainer {
   userId       String?      @unique
   user         User?        @relation(fields: [userId], references: [id])
   gymId        String
-  gym          Gym          @relation(fields: [gymId], references: [id])
+  gym          Gym          @relation(fields: [gymId], references: [id], onDelete: Cascade)
   name         String
   active       Boolean      @default(true)
+  startedAt    DateTime?
   createdAt    DateTime     @default(now())
 
   groups TrainerGroup[]
@@ -128,14 +129,15 @@ model Trainer {
 model Student {
   id                   String           @id @default(cuid())
   gymId                String
-  gym                  Gym              @relation(fields: [gymId], references: [id])
+  gym                  Gym              @relation(fields: [gymId], references: [id], onDelete: Cascade)
   firstName            String
   lastName             String
   birthDate            DateTime?
   nationalId           String?
+  phone1               String
+  phone2               String?
   emergencyPhone       String?
   emergencyContact     String?
-  phone                String?
   joinedAt             DateTime         @default(now())
   leftAt               DateTime?
   status               StudentStatus    @default(ACTIVO)
@@ -153,7 +155,7 @@ model Student {
 model Group {
   id           String   @id @default(cuid())
   gymId        String
-  gym          Gym      @relation(fields: [gymId], references: [id])
+  gym          Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
   name         String
   monthlyPrice Decimal  @db.Decimal(10, 2)
   maxCapacity  Int?
@@ -169,9 +171,9 @@ model Group {
 model TrainerGroup {
   id         String   @id @default(cuid())
   trainerId  String
-  trainer    Trainer  @relation(fields: [trainerId], references: [id])
+  trainer    Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
   groupId    String
-  group      Group    @relation(fields: [groupId], references: [id])
+  group      Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
   hourlyRate Decimal  @db.Decimal(10, 2)
   createdAt  DateTime @default(now())
 
@@ -197,9 +199,9 @@ model TrainerGroupSchedule {
 model StudentGroup {
   id         String   @id @default(cuid())
   studentId  String
-  student    Student  @relation(fields: [studentId], references: [id])
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   groupId    String
-  group      Group    @relation(fields: [groupId], references: [id])
+  group      Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
   enrolledAt DateTime @default(now())
 
   @@unique([studentId, groupId])
@@ -209,7 +211,7 @@ model StudentGroup {
 model Schedule {
   id          String      @id @default(cuid())
   groupId     String
-  group       Group       @relation(fields: [groupId], references: [id])
+  group       Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
   weekDays    DayOfWeek[]
   startTime   String // format "HH:MM"
   endTime     String // format "HH:MM"
@@ -233,7 +235,7 @@ model Payment {
   paidAt        DateTime?
   verified      Boolean        @default(false)
   cashClosingId String?
-  cashClosing   CashClosing?   @relation(fields: [cashClosingId], references: [id])
+  cashClosing   CashClosing?   @relation(fields: [cashClosingId], references: [id], onDelete: SetNull)
   notes         String?
   createdAt     DateTime       @default(now())
 

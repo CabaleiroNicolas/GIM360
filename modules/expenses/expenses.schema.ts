@@ -3,7 +3,7 @@ import { z } from "zod"
 export const createExpenseSchema = z.object({
   gymId: z.string().min(1),
   name: z.string().min(1),
-  amount: z.number().positive(),
+  amount: z.number().positive().multipleOf(0.01),
 })
 
 export const updateExpenseSchema = createExpenseSchema.omit({ gymId: true }).partial()

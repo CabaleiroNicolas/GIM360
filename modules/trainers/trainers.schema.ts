@@ -3,6 +3,7 @@ import { z } from "zod"
 export const createTrainerSchema = z.object({
   gymId: z.string().min(1),
   name: z.string().min(1),
+  startedAt: z.string().datetime().optional(),
 })
 
 export const updateTrainerSchema = createTrainerSchema.omit({ gymId: true }).partial()

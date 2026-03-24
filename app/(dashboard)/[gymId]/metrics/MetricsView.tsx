@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { SkeletonMetrics } from "@/components/ui/Skeleton"
 import { Input } from "@/components/ui/Input"
 import { Label } from "@/components/ui/Label"
 import { InfoTooltip } from "@/components/ui/InfoTooltip"
@@ -291,26 +292,43 @@ export default function MetricsView({ gymId }: { gymId: string }) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch(`/api/gyms/${gymId}`).then(r => r.json()).then(g => {
-      if (g?.createdAt) setMinPeriod(toYearMonth(new Date(g.createdAt)))
-    }).catch(() => {})
+    const controller = new AbortController()
+    fetch(`/api/gyms/${gymId}`, { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error("Error al cargar el gimnasio.")
+        return r.json()
+      })
+      .then((g) => {
+        if (g?.createdAt) setMinPeriod(toYearMonth(new Date(g.createdAt)))
+      })
+      .catch((err) => {
+        if (err instanceof Error && err.name === "AbortError") return
+      })
+    return () => controller.abort()
   }, [gymId])
 
-  const fetchMetrics = useCallback(async () => {
+  const fetchMetrics = useCallback(async (signal?: AbortSignal) => {
     setLoading(true); setError(null)
     try {
       const params = new URLSearchParams({ gymId, period })
       const [gymRes, groupsRes] = await Promise.all([
-        fetch(`/api/metrics/gym?${params}`), fetch(`/api/metrics/groups?${params}`),
+        fetch(`/api/metrics/gym?${params}`, { signal }), fetch(`/api/metrics/groups?${params}`, { signal }),
       ])
-      if (!gymRes.ok || !groupsRes.ok) { setError("Error al cargar las métricas."); return }
+      if (!gymRes.ok || !groupsRes.ok) { setError("No se pudieron cargar las métricas."); return }
       const [gym, groups] = await Promise.all([gymRes.json(), groupsRes.json()])
       setGymMetrics(gym); setGroupMetrics(groups)
-    } catch { setError("Error de red.") }
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return
+      setError("Error de conexión. Intentá de nuevo.")
+    }
     finally { setLoading(false) }
   }, [gymId, period])
 
-  useEffect(() => { fetchMetrics() }, [fetchMetrics])
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchMetrics(controller.signal)
+    return () => controller.abort()
+  }, [fetchMetrics])
 
   useEffect(() => { setSelectedGroup(null) }, [period])
 
@@ -362,7 +380,7 @@ export default function MetricsView({ gymId }: { gymId: string }) {
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       {loading ? (
-        <div className="py-20 text-center text-sm text-[#A5A49D]">Cargando métricas…</div>
+        <SkeletonMetrics />
       ) : gymMetrics ? (
         <>
           {/* ── GIMNASIO ── */}

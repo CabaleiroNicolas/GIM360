@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { signOut } from "next-auth/react"
 import Link from "next/link"
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
 
 type GymStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED"
 
@@ -22,15 +23,28 @@ const STATUS_CONFIG: Record<GymStatus, { label: string; dot: string; text: strin
 export default function DashboardPage() {
   const [gyms, setGyms] = useState<Gym[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch("/api/gyms")
-      .then((r) => r.json())
+    const controller = new AbortController()
+    setLoading(true)
+    setError(null)
+    fetch("/api/gyms", { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error("Error al cargar los gimnasios.")
+        return r.json()
+      })
       .then((data) => setGyms(Array.isArray(data) ? data : []))
+      .catch((err) => {
+        if (err instanceof Error && err.name === "AbortError") return
+        setError("No se pudieron cargar los gimnasios.")
+      })
       .finally(() => setLoading(false))
+    return () => controller.abort()
   }, [])
 
   return (
+    <ErrorBoundary>
     <div className="min-h-screen bg-[#F7F6F3]">
       {/* Top bar */}
       <header className="border-b border-[#E5E4E0] bg-white">
@@ -53,6 +67,12 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-semibold text-[#111110]">Mis gimnasios</h1>
           <p className="mt-1.5 text-sm text-[#68685F]">Seleccioná un gimnasio para continuar.</p>
         </div>
+
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
         {loading ? (
           <div className="py-20 text-center text-sm text-[#A5A49D]">Cargando…</div>
@@ -99,5 +119,6 @@ export default function DashboardPage() {
         )}
       </main>
     </div>
+    </ErrorBoundary>
   )
 }

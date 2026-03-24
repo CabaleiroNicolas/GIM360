@@ -1,4 +1,5 @@
 import MetricsView from "./MetricsView"
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
 
 export default async function MetricsPage({
   params,
@@ -6,5 +7,9 @@ export default async function MetricsPage({
   params: Promise<{ gymId: string }>
 }) {
   const { gymId } = await params
-  return <MetricsView gymId={gymId} />
+  return (
+    <ErrorBoundary>
+      <MetricsView gymId={gymId} />
+    </ErrorBoundary>
+  )
 }

@@ -8,11 +8,16 @@ import { PrismaClient } from "../app/generated/prisma/client"
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
 const db = new PrismaClient({ adapter })
 
+if (process.env.NODE_ENV === "production") {
+  console.error("seed.ts no debe ejecutarse en producción.")
+  process.exit(1)
+}
+
 async function main() {
   const email = "admin@gym360.com"
   const password = "admin1234"
 
-  const hashedPassword = await bcrypt.hash(password, 10)
+  const hashedPassword = await bcrypt.hash(password, 12)
 
   // Upsert user
   const user = await db.user.upsert({

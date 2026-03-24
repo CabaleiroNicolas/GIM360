@@ -21,7 +21,9 @@ export async function createCashClosing(input: CreateCashClosingInput) {
       throw new Error("No hay pagos cobrados sin verificar")
     }
 
-    const totalCollected = paidPayments.reduce((sum, p) => sum + Number(p.amount), 0)
+    const round2 = (n: number) => Math.round(n * 100) / 100
+
+    const totalCollected = round2(paidPayments.reduce((sum, p) => sum + Number(p.amount), 0))
 
     let efectivoCount = 0, efectivoTotal = 0
     let transferenciaCount = 0, transferenciaTotal = 0
@@ -38,6 +40,10 @@ export async function createCashClosing(input: CreateCashClosingInput) {
           tarjetaCount++; tarjetaTotal += amount; break
       }
     }
+
+    efectivoTotal = round2(efectivoTotal)
+    transferenciaTotal = round2(transferenciaTotal)
+    tarjetaTotal = round2(tarjetaTotal)
 
     const fromDate = paidPayments[0].paidAt!
     const toDate = paidPayments[paidPayments.length - 1].paidAt!

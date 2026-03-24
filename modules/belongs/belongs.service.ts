@@ -6,6 +6,17 @@ export async function gymBelongsToOwner(gymId: string, userId: string): Promise<
   return !!gym
 }
 
+/** Verifica si el usuario tiene acceso al gimnasio por cualquier rol (Owner o Trainer) */
+export async function gymBelongsToUser(gymId: string, userId: string): Promise<boolean> {
+  const ownerMatch = await db.gym.findFirst({ where: { id: gymId, owner: { userId } } })
+  if (ownerMatch) return true
+
+  const trainerMatch = await db.trainer.findFirst({ where: { gymId, userId } })
+  if (trainerMatch) return true
+
+  return false
+}
+
 /** Verifica si el trainer pertenece al gimnasio */
 export async function trainerBelongsToGym(trainerId: string, gymId: string): Promise<boolean> {
   const trainer = await db.trainer.findFirst({ where: { id: trainerId, gymId } })

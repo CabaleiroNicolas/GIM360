@@ -21,7 +21,7 @@ type Payment = {
   paymentMethod: PaymentMethod | null
   verified: boolean
   cashClosingId: string | null
-  student: { id: string; firstName: string; lastName: string; dueDay: number; phone: string | null }
+  student: { id: string; firstName: string; lastName: string; dueDay: number; phone1: string }
 }
 
 type ClosingReport = {
@@ -106,10 +106,20 @@ export default function PaymentsView({ gymId }: { gymId: string }) {
   const [gymName, setGymName] = useState("")
 
   useEffect(() => {
-    fetch(`/api/gyms/${gymId}`).then(r => r.json()).then(g => {
-      if (g?.createdAt) setMinPeriod(toYearMonth(new Date(g.createdAt)))
-      if (g?.name) setGymName(g.name)
-    }).catch(() => {})
+    const controller = new AbortController()
+    fetch(`/api/gyms/${gymId}`, { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error("Error al cargar el gimnasio.")
+        return r.json()
+      })
+      .then((g) => {
+        if (g?.createdAt) setMinPeriod(toYearMonth(new Date(g.createdAt)))
+        if (g?.name) setGymName(g.name)
+      })
+      .catch((err) => {
+        if (err instanceof Error && err.name === "AbortError") return
+      })
+    return () => controller.abort()
   }, [gymId])
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(false)
@@ -131,55 +141,89 @@ export default function PaymentsView({ gymId }: { gymId: string }) {
   const [closingSubmitting, setClosingSubmitting] = useState(false)
   const [closingReport, setClosingReport] = useState<ClosingReport | null>(null)
 
-  const fetchPayments = useCallback(async () => {
+  const [mutationError, setMutationError] = useState<string | null>(null)
+  const [closingError, setClosingError] = useState<string | null>(null)
+
+  const fetchPayments = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
-    const res = await fetch(`/api/payments?gymId=${gymId}&period=${period}`)
-    const data = await res.json()
-    if (res.ok && Array.isArray(data) && data.length === 0) {
-      const genRes = await fetch("/api/payments", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gymId, period }),
-      })
-      const genData = await genRes.json()
-      setPayments(genRes.ok ? genData : [])
-    } else {
-      setPayments(res.ok ? data : [])
+    setMutationError(null)
+    try {
+      const res = await fetch(`/api/payments?gymId=${gymId}&period=${period}`, { signal })
+      if (!res.ok) { setPayments([]); setMutationError("No se pudieron cargar los pagos."); return }
+      const data = await res.json()
+      if (Array.isArray(data) && data.length === 0) {
+        const genRes = await fetch("/api/payments", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ gymId, period }),
+          signal,
+        })
+        const genData = await genRes.json()
+        setPayments(genRes.ok ? genData : [])
+        if (!genRes.ok) setMutationError("No se pudieron cargar los pagos.")
+      } else {
+        setPayments(data)
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return
+      setMutationError("Error de conexión. Intentá de nuevo.")
+      setPayments([])
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [gymId, period])
 
-  useEffect(() => { fetchPayments() }, [fetchPayments])
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchPayments(controller.signal)
+    return () => controller.abort()
+  }, [fetchPayments])
 
   async function handleMarkPaid(id: string, method: PaymentMethod) {
     setPayMethodForId(null)
+    setMutationError(null)
     setUpdatingId(id)
-    const res = await fetch(`/api/payments/${id}?gymId=${gymId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "PAID", paidAt: new Date().toISOString(), paymentMethod: method }),
-    })
-    if (res.ok) {
-      const updated = await res.json()
-      setPayments((prev) => prev.map((p) => (p.id === id ? updated : p)))
+    try {
+      const res = await fetch(`/api/payments/${id}?gymId=${gymId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "PAID", paidAt: new Date().toISOString(), paymentMethod: method }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setPayments((prev) => prev.map((p) => (p.id === id ? updated : p)))
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setMutationError(data?.error ?? "No se pudo actualizar el pago.")
+      }
+    } catch {
+      setMutationError("Error de conexión. Intentá de nuevo.")
+    } finally {
+      setUpdatingId(null)
     }
-    setUpdatingId(null)
   }
 
   async function handleUnmarkPaid(id: string) {
     setConfirmUnpayId(null)
+    setMutationError(null)
     setUpdatingId(id)
-    const res = await fetch(`/api/payments/${id}?gymId=${gymId}`, { method: "DELETE" })
-    if (res.ok) {
-      // Regenerate so the student reappears as PENDING
-      await fetch("/api/payments", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gymId, period }),
-      })
-      await fetchPayments()
+    try {
+      const res = await fetch(`/api/payments/${id}?gymId=${gymId}`, { method: "DELETE" })
+      if (res.ok) {
+        // Regenerate so the student reappears as PENDING
+        await fetch("/api/payments", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ gymId, period }),
+        })
+        await fetchPayments()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setMutationError(data?.error ?? "No se pudo actualizar el pago.")
+      }
+    } catch {
+      setMutationError("Error de conexión. Intentá de nuevo.")
+    } finally {
+      setUpdatingId(null)
     }
-    setUpdatingId(null)
   }
-
-  const [closingError, setClosingError] = useState<string | null>(null)
 
   async function handleCashClosing() {
     setClosingSubmitting(true)
@@ -206,10 +250,10 @@ export default function PaymentsView({ gymId }: { gymId: string }) {
         setShowClosingConfirm(false)
         await fetchPayments()
       } else {
-        setClosingError(data?.error ?? "Error al cerrar caja")
+        setClosingError(data?.error ?? "No se pudo cerrar la caja.")
       }
     } catch {
-      setClosingError("Error de conexión al cerrar caja")
+      setClosingError("Error de conexión. Intentá de nuevo.")
     }
     setClosingSubmitting(false)
   }
@@ -351,6 +395,12 @@ export default function PaymentsView({ gymId }: { gymId: string }) {
         </div>
       )}
 
+      {mutationError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {mutationError}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Total" value={payments.length} subtitle={`$${total.toLocaleString("es-AR")}`} />
         <StatCard label="Pagados" value={paid} valueColor="text-emerald-700" subtitle={`$${collected.toLocaleString("es-AR")}`} />
@@ -464,9 +514,9 @@ export default function PaymentsView({ gymId }: { gymId: string }) {
               // PENDING / EXPIRED — show "Marcar pagado" + WhatsApp
               return (
                 <div className="flex items-center gap-2 justify-end">
-                  {p.student.phone && (
+                  {p.student.phone1 && (
                     <a
-                      href={whatsappUrl(p.student.phone, buildWhatsAppMessage(p, period, gymName))}
+                      href={whatsappUrl(p.student.phone1, buildWhatsAppMessage(p, period, gymName))}
                       target="_blank"
                       rel="noopener noreferrer"
                       title="Enviar recordatorio por WhatsApp"

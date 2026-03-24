@@ -109,6 +109,9 @@ export default function GroupsView({ gymId }: { gymId: string }) {
   const [scheduleRows, setScheduleRows] = useState<ScheduleRow[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   type SortKey = "name" | "price" | "students" | "coverage"
   const [sortKey, setSortKey] = useState<SortKey>("name")
@@ -173,7 +176,7 @@ export default function GroupsView({ gymId }: { gymId: string }) {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setFormError(data?.error ?? "Error al crear el grupo."); return
+        setFormError(data?.error ?? "No se pudo crear el grupo."); return
       }
 
       const created = await res.json()
@@ -188,9 +191,29 @@ export default function GroupsView({ gymId }: { gymId: string }) {
 
       resetForm(); setShowForm(false); await refetch()
     } catch {
-      setFormError("Error de conexión.")
+      setFormError("Error de conexión. Intentá de nuevo.")
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirmDeleteId) return
+    setDeleteSubmitting(true)
+    setDeleteError(null)
+    try {
+      const res = await fetch(`/api/groups/${confirmDeleteId}?gymId=${gymId}`, { method: "DELETE" })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setDeleteError(data?.error ?? "No se pudo eliminar el grupo.")
+        return
+      }
+      setConfirmDeleteId(null)
+      await refetch()
+    } catch {
+      setDeleteError("Error de conexión. Intentá de nuevo.")
+    } finally {
+      setDeleteSubmitting(false)
     }
   }
 
@@ -290,6 +313,21 @@ export default function GroupsView({ gymId }: { gymId: string }) {
         </div>
       </FormModal>
 
+      <FormModal
+        open={!!confirmDeleteId}
+        title="Eliminar grupo"
+        error={deleteError}
+        onSubmit={(e) => { e.preventDefault(); handleDelete() }}
+        submitting={deleteSubmitting}
+        onCancel={() => { setConfirmDeleteId(null); setDeleteError(null) }}
+        submitLabel="Eliminar"
+        submitVariant="destructive"
+      >
+        <p className="text-sm text-[#68685F] sm:col-span-2">
+          ¿Estás seguro de que querés eliminar este grupo? Se eliminarán también sus horarios y asignaciones de alumnos y entrenadores.
+        </p>
+      </FormModal>
+
       <SearchToolbar
         search={search} onSearchChange={setSearch} placeholder="Buscar grupo…"
         sortOptions={[
@@ -313,6 +351,15 @@ export default function GroupsView({ gymId }: { gymId: string }) {
             const cfg = COVERAGE_CONFIG[status]
             return <StatusDot dotColor={cfg.dot} textColor={cfg.text} label={cfg.label} />
           }},
+          { key: "actions", header: "", align: "right", render: (g) => (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(g.id); setDeleteError(null) }}
+              className="cursor-pointer text-xs text-red-500 hover:text-red-700 transition-colors"
+            >
+              Eliminar
+            </button>
+          )},
         ]}
         data={displayed}
         loading={loading}

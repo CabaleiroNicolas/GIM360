@@ -8,6 +8,8 @@ interface FormModalProps {
   submitting: boolean
   onCancel: () => void
   gridCols?: string
+  submitLabel?: string
+  submitVariant?: "primary" | "destructive"
   children: React.ReactNode
 }
 
@@ -19,6 +21,8 @@ export function FormModal({
   submitting,
   onCancel,
   gridCols = "sm:grid-cols-2",
+  submitLabel = "Guardar",
+  submitVariant = "primary",
   children,
 }: FormModalProps) {
   if (!open) return null
@@ -48,8 +52,12 @@ export function FormModal({
           <Button type="button" variant="secondary" onClick={onCancel}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={submitting}>
-            {submitting ? "Guardando\u2026" : "Guardar"}
+          <Button
+            type="submit"
+            disabled={submitting}
+            className={submitVariant === "destructive" ? "rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50" : undefined}
+          >
+            {submitting ? `${submitLabel}\u2026` : submitLabel}
           </Button>
         </div>
       </form>

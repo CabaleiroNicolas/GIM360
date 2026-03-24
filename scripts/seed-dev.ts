@@ -5,6 +5,11 @@ import bcrypt from "bcryptjs"
 import { PrismaPg } from "@prisma/adapter-pg"
 import { PrismaClient } from "../app/generated/prisma/client"
 
+if (process.env.NODE_ENV === "production") {
+  console.error("seed-dev.ts no debe ejecutarse en producción.")
+  process.exit(1)
+}
+
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
 const db = new PrismaClient({ adapter })
 
@@ -27,7 +32,7 @@ async function main() {
 
   // ── Owner + Gym ────────────────────────────────────────────────────────────
 
-  const hashedPassword = await bcrypt.hash("admin1234", 10)
+  const hashedPassword = await bcrypt.hash("admin1234", 12)
 
   const owner = await db.user.upsert({
     where: { email: "admin@gym360.com" },
@@ -256,38 +261,38 @@ async function main() {
   // ── Students ───────────────────────────────────────────────────────────────
 
   type StudentSeed = {
-    firstName: string; lastName: string; phone?: string; nationalId?: string
+    firstName: string; lastName: string; phone1: string; phone2?: string; nationalId?: string
     birthDate?: Date; joinedAt: Date; leftAt?: Date; status?: "ACTIVO" | "INACTIVO" | "PRUEBA"
     trialEndsAt?: Date; dueDay: number; groups: string[]
   }
 
   const studentsData: StudentSeed[] = [
     // Principiantes
-    { firstName: "Ana", lastName: "Garcia", phone: "1123456789", joinedAt: date(2025, 10, 5), dueDay: 5, groups: [gPrinc.id] },
-    { firstName: "Carlos", lastName: "Lopez", phone: "1198765432", joinedAt: date(2025, 11, 12), dueDay: 12, groups: [gPrinc.id] },
-    { firstName: "Martina", lastName: "Alvarez", phone: "1167890123", joinedAt: date(2026, 1, 15), dueDay: 15, groups: [gPrinc.id] },
+    { firstName: "Ana", lastName: "Garcia", phone1: "1123456789", joinedAt: date(2025, 10, 5), dueDay: 5, groups: [gPrinc.id] },
+    { firstName: "Carlos", lastName: "Lopez", phone1: "1198765432", joinedAt: date(2025, 11, 12), dueDay: 12, groups: [gPrinc.id] },
+    { firstName: "Martina", lastName: "Alvarez", phone1: "1167890123", joinedAt: date(2026, 1, 15), dueDay: 15, groups: [gPrinc.id] },
     // Intermedio
-    { firstName: "Sofia", lastName: "Martinez", phone: "1134567890", nationalId: "38111222", joinedAt: date(2026, 1, 1), dueDay: 1, groups: [gInter.id] },
-    { firstName: "Tomas", lastName: "Fernandez", phone: "1156789012", joinedAt: date(2025, 9, 20), dueDay: 20, groups: [gInter.id] },
-    { firstName: "Lautaro", lastName: "Gimenez", phone: "1101234567", joinedAt: date(2025, 11, 1), dueDay: 1, groups: [gInter.id] },
+    { firstName: "Sofia", lastName: "Martinez", phone1: "1134567890", nationalId: "38111222", joinedAt: date(2026, 1, 1), dueDay: 1, groups: [gInter.id] },
+    { firstName: "Tomas", lastName: "Fernandez", phone1: "1156789012", joinedAt: date(2025, 9, 20), dueDay: 20, groups: [gInter.id] },
+    { firstName: "Lautaro", lastName: "Gimenez", phone1: "1101234567", joinedAt: date(2025, 11, 1), dueDay: 1, groups: [gInter.id] },
     // Avanzado
-    { firstName: "Valentina", lastName: "Rodriguez", phone: "1178901234", nationalId: "40333444", joinedAt: date(2025, 8, 15), dueDay: 15, groups: [gAvanz.id] },
-    { firstName: "Joaquin", lastName: "Herrera", phone: "1189012345", nationalId: "41555666", joinedAt: date(2025, 7, 10), dueDay: 10, groups: [gAvanz.id] },
+    { firstName: "Valentina", lastName: "Rodriguez", phone1: "1178901234", nationalId: "40333444", joinedAt: date(2025, 8, 15), dueDay: 15, groups: [gAvanz.id] },
+    { firstName: "Joaquin", lastName: "Herrera", phone1: "1189012345", nationalId: "41555666", joinedAt: date(2025, 7, 10), dueDay: 10, groups: [gAvanz.id] },
     // Competicion
-    { firstName: "Milagros", lastName: "Romero", phone: "1145671234", nationalId: "39222333", joinedAt: date(2025, 6, 1), dueDay: 1, groups: [gCompe.id] },
-    { firstName: "Agustina", lastName: "Cabrera", phone: "1156782345", nationalId: "40444555", joinedAt: date(2025, 9, 1), dueDay: 1, groups: [gCompe.id] },
-    { firstName: "Florencia", lastName: "Molina", phone: "1167893456", joinedAt: date(2026, 1, 10), dueDay: 10, groups: [gCompe.id] },
+    { firstName: "Milagros", lastName: "Romero", phone1: "1145671234", nationalId: "39222333", joinedAt: date(2025, 6, 1), dueDay: 1, groups: [gCompe.id] },
+    { firstName: "Agustina", lastName: "Cabrera", phone1: "1156782345", nationalId: "40444555", joinedAt: date(2025, 9, 1), dueDay: 1, groups: [gCompe.id] },
+    { firstName: "Florencia", lastName: "Molina", phone1: "1167893456", joinedAt: date(2026, 1, 10), dueDay: 10, groups: [gCompe.id] },
     // Baby Gym
-    { firstName: "Isabella", lastName: "Paz", phone: "1178904567", birthDate: date(2021, 3, 15), joinedAt: date(2026, 2, 1), dueDay: 1, groups: [gBaby.id] },
-    { firstName: "Mateo", lastName: "Rios", phone: "1189015678", birthDate: date(2020, 8, 22), joinedAt: date(2026, 2, 1), dueDay: 1, groups: [gBaby.id] },
+    { firstName: "Isabella", lastName: "Paz", phone1: "1178904567", birthDate: date(2021, 3, 15), joinedAt: date(2026, 2, 1), dueDay: 1, groups: [gBaby.id] },
+    { firstName: "Mateo", lastName: "Rios", phone1: "1189015678", birthDate: date(2020, 8, 22), joinedAt: date(2026, 2, 1), dueDay: 1, groups: [gBaby.id] },
     // Multi-grupo
-    { firstName: "Lucas", lastName: "Sanchez", phone: "1190123456", joinedAt: date(2026, 2, 3), dueDay: 3, groups: [gPrinc.id, gInter.id] },
-    { firstName: "Camila", lastName: "Torres", phone: "1112345678", joinedAt: date(2025, 12, 8), dueDay: 8, groups: [gPrinc.id, gAvanz.id] },
-    { firstName: "Emilia", lastName: "Suarez", phone: "1123456780", nationalId: "39888999", joinedAt: date(2025, 10, 1), dueDay: 1, groups: [gAvanz.id, gCompe.id] },
+    { firstName: "Lucas", lastName: "Sanchez", phone1: "1190123456", joinedAt: date(2026, 2, 3), dueDay: 3, groups: [gPrinc.id, gInter.id] },
+    { firstName: "Camila", lastName: "Torres", phone1: "1112345678", joinedAt: date(2025, 12, 8), dueDay: 8, groups: [gPrinc.id, gAvanz.id] },
+    { firstName: "Emilia", lastName: "Suarez", phone1: "1123456780", nationalId: "39888999", joinedAt: date(2025, 10, 1), dueDay: 1, groups: [gAvanz.id, gCompe.id] },
     // Inactivo
-    { firstName: "Diego", lastName: "Morales", phone: "1145678901", joinedAt: date(2025, 6, 1), leftAt: date(2026, 1, 31), status: "INACTIVO", dueDay: 1, groups: [gPrinc.id] },
+    { firstName: "Diego", lastName: "Morales", phone1: "1145678901", joinedAt: date(2025, 6, 1), leftAt: date(2026, 1, 31), status: "INACTIVO", dueDay: 1, groups: [gPrinc.id] },
     // Prueba
-    { firstName: "Renata", lastName: "Vidal", phone: "1199887766", joinedAt: date(2026, 3, 10), status: "PRUEBA", trialEndsAt: date(2026, 4, 10), dueDay: 10, groups: [gPrinc.id] },
+    { firstName: "Renata", lastName: "Vidal", phone1: "1199887766", joinedAt: date(2026, 3, 10), status: "PRUEBA", trialEndsAt: date(2026, 4, 10), dueDay: 10, groups: [gPrinc.id] },
   ]
 
   const students = await Promise.all(
@@ -542,43 +547,43 @@ async function main() {
   // ── Students (muchos, buena ocupacion) ──
 
   type StudentSeed2 = {
-    firstName: string; lastName: string; phone?: string
+    firstName: string; lastName: string; phone1: string; phone2?: string
     joinedAt: Date; dueDay: number; groups: string[]
   }
 
   const students2Data: StudentSeed2[] = [
     // Iniciacion (12 de 15 = 80%)
-    { firstName: "Paula", lastName: "Rivas", phone: "1111000001", joinedAt: date(2025, 8, 1), dueDay: 1, groups: [g2Iniciacion.id] },
-    { firstName: "Clara", lastName: "Dominguez", phone: "1111000002", joinedAt: date(2025, 8, 5), dueDay: 5, groups: [g2Iniciacion.id] },
-    { firstName: "Lucia", lastName: "Pereyra", phone: "1111000003", joinedAt: date(2025, 9, 1), dueDay: 1, groups: [g2Iniciacion.id] },
-    { firstName: "Maia", lastName: "Acosta", phone: "1111000004", joinedAt: date(2025, 9, 10), dueDay: 10, groups: [g2Iniciacion.id] },
-    { firstName: "Delfina", lastName: "Castro", phone: "1111000005", joinedAt: date(2025, 10, 1), dueDay: 1, groups: [g2Iniciacion.id] },
-    { firstName: "Alma", lastName: "Medina", phone: "1111000006", joinedAt: date(2025, 10, 15), dueDay: 15, groups: [g2Iniciacion.id] },
-    { firstName: "Bianca", lastName: "Rojas", phone: "1111000007", joinedAt: date(2025, 11, 1), dueDay: 1, groups: [g2Iniciacion.id] },
-    { firstName: "Pilar", lastName: "Navarro", phone: "1111000008", joinedAt: date(2025, 11, 5), dueDay: 5, groups: [g2Iniciacion.id] },
-    { firstName: "Juana", lastName: "Ortiz", phone: "1111000009", joinedAt: date(2025, 12, 1), dueDay: 1, groups: [g2Iniciacion.id] },
-    { firstName: "Elena", lastName: "Silva", phone: "1111000010", joinedAt: date(2026, 1, 1), dueDay: 1, groups: [g2Iniciacion.id] },
-    { firstName: "Nina", lastName: "Vargas", phone: "1111000011", joinedAt: date(2026, 1, 10), dueDay: 10, groups: [g2Iniciacion.id] },
-    { firstName: "Zoe", lastName: "Aguirre", phone: "1111000012", joinedAt: date(2026, 2, 1), dueDay: 1, groups: [g2Iniciacion.id] },
+    { firstName: "Paula", lastName: "Rivas", phone1: "1111000001", joinedAt: date(2025, 8, 1), dueDay: 1, groups: [g2Iniciacion.id] },
+    { firstName: "Clara", lastName: "Dominguez", phone1: "1111000002", joinedAt: date(2025, 8, 5), dueDay: 5, groups: [g2Iniciacion.id] },
+    { firstName: "Lucia", lastName: "Pereyra", phone1: "1111000003", joinedAt: date(2025, 9, 1), dueDay: 1, groups: [g2Iniciacion.id] },
+    { firstName: "Maia", lastName: "Acosta", phone1: "1111000004", joinedAt: date(2025, 9, 10), dueDay: 10, groups: [g2Iniciacion.id] },
+    { firstName: "Delfina", lastName: "Castro", phone1: "1111000005", joinedAt: date(2025, 10, 1), dueDay: 1, groups: [g2Iniciacion.id] },
+    { firstName: "Alma", lastName: "Medina", phone1: "1111000006", joinedAt: date(2025, 10, 15), dueDay: 15, groups: [g2Iniciacion.id] },
+    { firstName: "Bianca", lastName: "Rojas", phone1: "1111000007", joinedAt: date(2025, 11, 1), dueDay: 1, groups: [g2Iniciacion.id] },
+    { firstName: "Pilar", lastName: "Navarro", phone1: "1111000008", joinedAt: date(2025, 11, 5), dueDay: 5, groups: [g2Iniciacion.id] },
+    { firstName: "Juana", lastName: "Ortiz", phone1: "1111000009", joinedAt: date(2025, 12, 1), dueDay: 1, groups: [g2Iniciacion.id] },
+    { firstName: "Elena", lastName: "Silva", phone1: "1111000010", joinedAt: date(2026, 1, 1), dueDay: 1, groups: [g2Iniciacion.id] },
+    { firstName: "Nina", lastName: "Vargas", phone1: "1111000011", joinedAt: date(2026, 1, 10), dueDay: 10, groups: [g2Iniciacion.id] },
+    { firstName: "Zoe", lastName: "Aguirre", phone1: "1111000012", joinedAt: date(2026, 2, 1), dueDay: 1, groups: [g2Iniciacion.id] },
     // Formativo (10 de 12 = 83%)
-    { firstName: "Abril", lastName: "Luna", phone: "1111000013", joinedAt: date(2025, 7, 1), dueDay: 1, groups: [g2Formativo.id] },
-    { firstName: "Catalina", lastName: "Flores", phone: "1111000014", joinedAt: date(2025, 7, 10), dueDay: 10, groups: [g2Formativo.id] },
-    { firstName: "Victoria", lastName: "Guerrero", phone: "1111000015", joinedAt: date(2025, 8, 1), dueDay: 1, groups: [g2Formativo.id] },
-    { firstName: "Olivia", lastName: "Sosa", phone: "1111000016", joinedAt: date(2025, 9, 1), dueDay: 1, groups: [g2Formativo.id] },
-    { firstName: "Antonella", lastName: "Campos", phone: "1111000017", joinedAt: date(2025, 9, 15), dueDay: 15, groups: [g2Formativo.id] },
-    { firstName: "Lola", lastName: "Vera", phone: "1111000018", joinedAt: date(2025, 10, 1), dueDay: 1, groups: [g2Formativo.id] },
-    { firstName: "Sara", lastName: "Godoy", phone: "1111000019", joinedAt: date(2025, 11, 1), dueDay: 1, groups: [g2Formativo.id] },
-    { firstName: "Jazmín", lastName: "Ibarra", phone: "1111000020", joinedAt: date(2025, 11, 10), dueDay: 10, groups: [g2Formativo.id] },
-    { firstName: "Rocio", lastName: "Ledesma", phone: "1111000021", joinedAt: date(2026, 1, 1), dueDay: 1, groups: [g2Formativo.id] },
-    { firstName: "Candela", lastName: "Figueroa", phone: "1111000022", joinedAt: date(2026, 2, 1), dueDay: 1, groups: [g2Formativo.id] },
+    { firstName: "Abril", lastName: "Luna", phone1: "1111000013", joinedAt: date(2025, 7, 1), dueDay: 1, groups: [g2Formativo.id] },
+    { firstName: "Catalina", lastName: "Flores", phone1: "1111000014", joinedAt: date(2025, 7, 10), dueDay: 10, groups: [g2Formativo.id] },
+    { firstName: "Victoria", lastName: "Guerrero", phone1: "1111000015", joinedAt: date(2025, 8, 1), dueDay: 1, groups: [g2Formativo.id] },
+    { firstName: "Olivia", lastName: "Sosa", phone1: "1111000016", joinedAt: date(2025, 9, 1), dueDay: 1, groups: [g2Formativo.id] },
+    { firstName: "Antonella", lastName: "Campos", phone1: "1111000017", joinedAt: date(2025, 9, 15), dueDay: 15, groups: [g2Formativo.id] },
+    { firstName: "Lola", lastName: "Vera", phone1: "1111000018", joinedAt: date(2025, 10, 1), dueDay: 1, groups: [g2Formativo.id] },
+    { firstName: "Sara", lastName: "Godoy", phone1: "1111000019", joinedAt: date(2025, 11, 1), dueDay: 1, groups: [g2Formativo.id] },
+    { firstName: "Jazmín", lastName: "Ibarra", phone1: "1111000020", joinedAt: date(2025, 11, 10), dueDay: 10, groups: [g2Formativo.id] },
+    { firstName: "Rocio", lastName: "Ledesma", phone1: "1111000021", joinedAt: date(2026, 1, 1), dueDay: 1, groups: [g2Formativo.id] },
+    { firstName: "Candela", lastName: "Figueroa", phone1: "1111000022", joinedAt: date(2026, 2, 1), dueDay: 1, groups: [g2Formativo.id] },
     // Elite (7 de 8 = 88%)
-    { firstName: "Sol", lastName: "Montenegro", phone: "1111000023", joinedAt: date(2025, 6, 1), dueDay: 1, groups: [g2Elite.id] },
-    { firstName: "Luz", lastName: "Villarreal", phone: "1111000024", joinedAt: date(2025, 7, 1), dueDay: 1, groups: [g2Elite.id] },
-    { firstName: "Mila", lastName: "Ponce", phone: "1111000025", joinedAt: date(2025, 8, 1), dueDay: 1, groups: [g2Elite.id] },
-    { firstName: "Uma", lastName: "Quiroga", phone: "1111000026", joinedAt: date(2025, 9, 1), dueDay: 1, groups: [g2Elite.id] },
-    { firstName: "Gala", lastName: "Espinoza", phone: "1111000027", joinedAt: date(2025, 10, 1), dueDay: 1, groups: [g2Elite.id] },
-    { firstName: "Mora", lastName: "Correa", phone: "1111000028", joinedAt: date(2025, 11, 1), dueDay: 1, groups: [g2Elite.id] },
-    { firstName: "India", lastName: "Bustos", phone: "1111000029", joinedAt: date(2026, 1, 1), dueDay: 1, groups: [g2Elite.id] },
+    { firstName: "Sol", lastName: "Montenegro", phone1: "1111000023", joinedAt: date(2025, 6, 1), dueDay: 1, groups: [g2Elite.id] },
+    { firstName: "Luz", lastName: "Villarreal", phone1: "1111000024", joinedAt: date(2025, 7, 1), dueDay: 1, groups: [g2Elite.id] },
+    { firstName: "Mila", lastName: "Ponce", phone1: "1111000025", joinedAt: date(2025, 8, 1), dueDay: 1, groups: [g2Elite.id] },
+    { firstName: "Uma", lastName: "Quiroga", phone1: "1111000026", joinedAt: date(2025, 9, 1), dueDay: 1, groups: [g2Elite.id] },
+    { firstName: "Gala", lastName: "Espinoza", phone1: "1111000027", joinedAt: date(2025, 10, 1), dueDay: 1, groups: [g2Elite.id] },
+    { firstName: "Mora", lastName: "Correa", phone1: "1111000028", joinedAt: date(2025, 11, 1), dueDay: 1, groups: [g2Elite.id] },
+    { firstName: "India", lastName: "Bustos", phone1: "1111000029", joinedAt: date(2026, 1, 1), dueDay: 1, groups: [g2Elite.id] },
   ]
 
   const students2 = await Promise.all(

@@ -60,7 +60,7 @@ export default function ExpensesView({ gymId }: { gymId: string }) {
       body: JSON.stringify({ gymId, name: form.name.trim(), amount: Number(form.amount) }),
     })
     if (res.ok) { setForm(EMPTY_FORM); setShowForm(false); await refetch() }
-    else { const d = await res.json().catch(() => ({})); setFormError(d?.error ?? "Error al crear el gasto.") }
+    else { const d = await res.json().catch(() => ({})); setFormError(d?.error ?? "No se pudo crear el gasto.") }
     setSubmitting(false)
   }
 
@@ -80,7 +80,7 @@ export default function ExpensesView({ gymId }: { gymId: string }) {
       body: JSON.stringify({ name: editForm.name.trim(), amount: Number(editForm.amount) }),
     })
     if (res.ok) { setEditingId(null); await refetch() }
-    else { const d = await res.json().catch(() => ({})); setEditError(d?.error ?? "Error al actualizar el gasto.") }
+    else { const d = await res.json().catch(() => ({})); setEditError(d?.error ?? "No se pudo actualizar el gasto.") }
     setEditSubmitting(false)
   }
 

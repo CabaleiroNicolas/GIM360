@@ -13,7 +13,7 @@ function parsePeriod(period: string): Date {
 const paymentWithStudent = {
   include: {
     student: {
-      select: { id: true, firstName: true, lastName: true, dueDay: true, phone: true },
+      select: { id: true, firstName: true, lastName: true, dueDay: true, phone1: true },
     },
   },
 } as const
@@ -41,10 +41,10 @@ export async function generateMonthlyPayments(gymId: string, period: string) {
   })
 
   const records = students.map((student) => {
-    const amount = student.groups.reduce(
+    const amount = Math.round(student.groups.reduce(
       (sum, sg) => sum + Number(sg.group.monthlyPrice),
       0
-    )
+    ) * 100) / 100
     return { gymId, studentId: student.id, period: periodDate, amount }
   })
 
@@ -61,7 +61,7 @@ export async function expireOverduePayments(gymId: string, period: string) {
   const periodDate = parsePeriod(period)
   const [year, month] = period.split("-").map(Number)
   const now = new Date()
-  const lastDay = new Date(year, month, 0).getDate()
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
 
   const payments = await db.payment.findMany({
     where: { gymId, period: periodDate, status: { in: ["PENDING", "EXPIRED"] } },
@@ -72,7 +72,7 @@ export async function expireOverduePayments(gymId: string, period: string) {
   const toRevert: string[] = []
 
   for (const p of payments) {
-    const due = new Date(year, month - 1, Math.min(p.student.dueDay, lastDay))
+    const due = new Date(Date.UTC(year, month - 1, Math.min(p.student.dueDay, lastDay)))
     if (p.status === "PENDING" && due < now) toExpire.push(p.id)
     else if (p.status === "EXPIRED" && due >= now) toRevert.push(p.id)
   }

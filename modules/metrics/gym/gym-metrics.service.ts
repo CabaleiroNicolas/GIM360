@@ -82,25 +82,27 @@ export async function getGymMetrics(input: MetricsQueryInput): Promise<GymMetric
     }),
   ])
 
-  const totalCollectedRevenue = Number(paidAgg._sum.amount ?? 0)
-  const totalPendingRevenue = Number(pendingAgg._sum.amount ?? 0)
+  const round2 = (n: number) => Math.round(n * 100) / 100
 
-  const totalFixedExpenses = fixedExpenses.reduce(
+  const totalCollectedRevenue = round2(Number(paidAgg._sum.amount ?? 0))
+  const totalPendingRevenue = round2(Number(pendingAgg._sum.amount ?? 0))
+
+  const totalFixedExpenses = round2(fixedExpenses.reduce(
     (sum, fe) => sum + Number(fe.amount),
     0
-  )
+  ))
 
   // Trainer cost: each active trainer × each group × hourlyRate × (actual minutes / 60)
-  const totalTrainerCost = trainers.reduce((trainerSum, trainer) => {
+  const totalTrainerCost = round2(trainers.reduce((trainerSum, trainer) => {
     const groupCost = trainer.groups.reduce((groupSum, tg) => {
       const rate = Number(tg.hourlyRate)
       const trainerMinutes = computeTrainerMonthlyMinutes(tg.schedules)
       return groupSum + rate * (trainerMinutes / 60)
     }, 0)
     return trainerSum + groupCost
-  }, 0)
+  }, 0))
 
-  const ebitda = totalCollectedRevenue - totalTrainerCost - totalFixedExpenses
+  const ebitda = round2(totalCollectedRevenue - totalTrainerCost - totalFixedExpenses)
 
   return {
     gymId: input.gymId,

@@ -4,7 +4,7 @@ import { DayOfWeek } from "@/app/generated/prisma/client"
 export const createGroupSchema = z.object({
   gymId: z.string().min(1),
   name: z.string().min(1),
-  monthlyPrice: z.number().positive(),
+  monthlyPrice: z.number().positive().multipleOf(0.01),
   maxCapacity: z.number().int().positive().optional(),
 })
 
@@ -24,12 +24,12 @@ const trainerScheduleEntrySchema = z
 
 export const assignTrainerSchema = z.object({
   trainerId: z.string().min(1),
-  hourlyRate: z.number().positive(),
+  hourlyRate: z.number().positive().multipleOf(0.01),
   schedules: z.array(trainerScheduleEntrySchema).min(1, "Al menos un horario es requerido"),
 })
 
 export const updateTrainerAssignmentSchema = z.object({
-  hourlyRate: z.number().positive(),
+  hourlyRate: z.number().positive().multipleOf(0.01),
   schedules: z.array(trainerScheduleEntrySchema).min(1, "Al menos un horario es requerido"),
 })
 

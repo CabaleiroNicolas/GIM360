@@ -1,4 +1,5 @@
 import PaymentsView from "./PaymentsView"
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
 
 export default async function PaymentsPage({
   params,
@@ -6,5 +7,9 @@ export default async function PaymentsPage({
   params: Promise<{ gymId: string }>
 }) {
   const { gymId } = await params
-  return <PaymentsView gymId={gymId} />
+  return (
+    <ErrorBoundary>
+      <PaymentsView gymId={gymId} />
+    </ErrorBoundary>
+  )
 }

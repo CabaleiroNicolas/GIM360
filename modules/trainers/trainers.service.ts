@@ -28,11 +28,22 @@ export async function getTrainerById(id: string) {
 }
 
 export async function createTrainer(data: CreateTrainerInput) {
-  return db.trainer.create({ data })
+  return db.trainer.create({
+    data: {
+      ...data,
+      startedAt: data.startedAt ? new Date(data.startedAt) : undefined,
+    },
+  })
 }
 
 export async function updateTrainer(id: string, data: UpdateTrainerInput) {
-  return db.trainer.update({ where: { id }, data })
+  return db.trainer.update({
+    where: { id },
+    data: {
+      ...data,
+      startedAt: data.startedAt ? new Date(data.startedAt) : undefined,
+    },
+  })
 }
 
 // Soft delete: trainer has active Boolean

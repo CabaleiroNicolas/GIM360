@@ -33,6 +33,7 @@ type Trainer = {
   id: string
   name: string
   active: boolean
+  startedAt: string | null
   groups: TrainerGroupAssignment[]
 }
 
@@ -76,6 +77,18 @@ function formatCurrency(n: number): string {
   return `$${Math.round(n).toLocaleString("es-AR")}`
 }
 
+function formatSeniority(startedAt: string): string {
+  const start = new Date(startedAt)
+  const now = new Date()
+  let years = now.getFullYear() - start.getFullYear()
+  let months = now.getMonth() - start.getMonth()
+  if (months < 0) { years -= 1; months += 12 }
+  if (years === 0 && months === 0) return "Menos de 1 mes"
+  if (years === 0) return `${months} ${months === 1 ? "mes" : "meses"}`
+  if (months === 0) return `${years} ${years === 1 ? "año" : "años"}`
+  return `${years} ${years === 1 ? "año" : "años"}, ${months} ${months === 1 ? "mes" : "meses"}`
+}
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export default function TrainersView({ gymId }: { gymId: string }) {
@@ -85,7 +98,7 @@ export default function TrainersView({ gymId }: { gymId: string }) {
   )
   const [showInactive, setShowInactive] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState<{ name: string }>({ name: "" })
+  const [form, setForm] = useState<{ name: string; startedAt: string }>({ name: "", startedAt: "" })
   const [assignForm, setAssignForm] = useState<GroupAssignForm>(EMPTY_ASSIGN)
   const [showGroupSection, setShowGroupSection] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -94,9 +107,16 @@ export default function TrainersView({ gymId }: { gymId: string }) {
 
   useEffect(() => {
     if (!showForm) return
-    fetch(`/api/groups?gymId=${gymId}`).then((r) => r.ok ? r.json() : []).then((groups) =>
-      setGymGroups(groups.map((g: GymGroup) => ({ id: g.id, name: g.name, schedules: g.schedules })))
-    )
+    const controller = new AbortController()
+    fetch(`/api/groups?gymId=${gymId}`, { signal: controller.signal })
+      .then((r) => r.ok ? r.json() : [])
+      .then((groups) =>
+        setGymGroups(groups.map((g: GymGroup) => ({ id: g.id, name: g.name, schedules: g.schedules })))
+      )
+      .catch((err) => {
+        if (err instanceof Error && err.name === "AbortError") return
+      })
+    return () => controller.abort()
   }, [showForm, gymId])
 
   // Detail panel
@@ -105,7 +125,7 @@ export default function TrainersView({ gymId }: { gymId: string }) {
 
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false)
-  const [editForm, setEditForm] = useState<{ name: string }>({ name: "" })
+  const [editForm, setEditForm] = useState<{ name: string; startedAt: string }>({ name: "", startedAt: "" })
   const [editSubmitting, setEditSubmitting] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
@@ -180,13 +200,15 @@ export default function TrainersView({ gymId }: { gymId: string }) {
     }
 
     setSubmitting(true)
+    const createBody: Record<string, unknown> = { gymId, name: form.name.trim() }
+    if (form.startedAt) createBody.startedAt = new Date(form.startedAt).toISOString()
     const res = await fetch("/api/trainers", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gymId, name: form.name.trim() }),
+      body: JSON.stringify(createBody),
     })
     if (!res.ok) {
       const d = await res.json().catch(() => ({}))
-      setFormError(d?.error ?? "Error al crear el entrenador.")
+      setFormError(d?.error ?? "No se pudo crear el entrenador.")
       setSubmitting(false)
       return
     }
@@ -213,7 +235,7 @@ export default function TrainersView({ gymId }: { gymId: string }) {
       }
     }
 
-    setForm({ name: "" }); setAssignForm(EMPTY_ASSIGN); setShowGroupSection(false); setShowForm(false); await refetch()
+    setForm({ name: "", startedAt: "" }); setAssignForm(EMPTY_ASSIGN); setShowGroupSection(false); setShowForm(false); await refetch()
     setSubmitting(false)
   }
 
@@ -231,7 +253,10 @@ export default function TrainersView({ gymId }: { gymId: string }) {
 
   function startEdit() {
     if (!selectedTrainer) return
-    setEditForm({ name: selectedTrainer.name })
+    const dateValue = selectedTrainer.startedAt
+      ? new Date(selectedTrainer.startedAt).toISOString().split("T")[0]
+      : ""
+    setEditForm({ name: selectedTrainer.name, startedAt: dateValue })
     setShowEditModal(true)
     setEditError(null)
   }
@@ -242,12 +267,15 @@ export default function TrainersView({ gymId }: { gymId: string }) {
     setEditError(null)
     if (!editForm.name.trim()) { setEditError("El nombre es obligatorio."); return }
     setEditSubmitting(true)
+    const patchBody: Record<string, unknown> = { name: editForm.name.trim() }
+    if (editForm.startedAt) patchBody.startedAt = new Date(editForm.startedAt).toISOString()
+    else patchBody.startedAt = null
     const res = await fetch(`/api/trainers/${selectedTrainer.id}?gymId=${gymId}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editForm.name.trim() }),
+      body: JSON.stringify(patchBody),
     })
     if (res.ok) { setShowEditModal(false); await refetch() }
-    else { const d = await res.json().catch(() => ({})); setEditError(d?.error ?? "Error al actualizar.") }
+    else { const d = await res.json().catch(() => ({})); setEditError(d?.error ?? "No se pudo actualizar el entrenador.") }
     setEditSubmitting(false)
   }
 
@@ -297,11 +325,14 @@ export default function TrainersView({ gymId }: { gymId: string }) {
         error={formError}
         onSubmit={handleCreate}
         submitting={submitting}
-        onCancel={() => { setShowForm(false); setForm({ name: "" }); setAssignForm(EMPTY_ASSIGN); setShowGroupSection(false); setFormError(null) }}
+        onCancel={() => { setShowForm(false); setForm({ name: "", startedAt: "" }); setAssignForm(EMPTY_ASSIGN); setShowGroupSection(false); setFormError(null) }}
         gridCols="sm:grid-cols-1"
       >
         <FormField label="Nombre" required>
           <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Ej: Carlos López" />
+        </FormField>
+        <FormField label="Fecha de inicio">
+          <Input type="date" value={form.startedAt} onChange={(e) => setForm((f) => ({ ...f, startedAt: e.target.value }))} />
         </FormField>
 
         {/* ── Optional group assignment ── */}
@@ -446,11 +477,27 @@ export default function TrainersView({ gymId }: { gymId: string }) {
             <div className="px-6 py-5 space-y-6">
               {/* ── Actions ──────────────────────────────────────────────── */}
               <div className="flex items-center gap-3">
-                <Button variant="secondary" onClick={startEdit}>Editar nombre</Button>
+                <Button variant="secondary" onClick={startEdit}>Editar</Button>
                 {selectedTrainer.active && (
                   <Button variant="danger" onClick={() => setConfirmId(selectedTrainer.id)}>Desactivar</Button>
                 )}
               </div>
+
+              {/* ── Info ─────────────────────────────────────────────────── */}
+              {selectedTrainer.startedAt && (
+                <div className="rounded-lg border border-[#E5E4E0] bg-[#FAFAF9] px-4 py-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#A5A49D]">Fecha de inicio</span>
+                    <span suppressHydrationWarning className="text-sm font-mono text-[#111110]">
+                      {new Date(selectedTrainer.startedAt).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#A5A49D]">Antigüedad</span>
+                    <span suppressHydrationWarning className="text-sm font-medium text-[#68685F]">{formatSeniority(selectedTrainer.startedAt)}</span>
+                  </div>
+                </div>
+              )}
 
               {/* ── Summary ──────────────────────────────────────────────── */}
               <div>
@@ -533,7 +580,10 @@ export default function TrainersView({ gymId }: { gymId: string }) {
         gridCols="sm:grid-cols-1"
       >
         <FormField label="Nombre" required>
-          <Input value={editForm.name} onChange={(e) => setEditForm({ name: e.target.value })} placeholder="Ej: Carlos López" />
+          <Input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} placeholder="Ej: Carlos López" />
+        </FormField>
+        <FormField label="Fecha de inicio">
+          <Input type="date" value={editForm.startedAt} onChange={(e) => setEditForm((f) => ({ ...f, startedAt: e.target.value }))} />
         </FormField>
       </FormModal>
 

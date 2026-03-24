@@ -45,7 +45,7 @@ type DayOfWeek = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "S
 
 type Student = {
   id: string; firstName: string; lastName: string
-  phone: string | null
+  phone1: string; phone2: string | null
   leftAt: string | null; dueDay: number
   status: StudentStatus
   trialEndsAt: string | null
@@ -63,7 +63,7 @@ type EnrolledGroup = {
 
 type StudentDetail = {
   id: string; firstName: string; lastName: string
-  phone: string | null; emergencyContact: string | null; emergencyPhone: string | null
+  phone1: string; phone2: string | null; emergencyContact: string | null; emergencyPhone: string | null
   birthDate: string | null; nationalId: string | null
   joinedAt: string; leftAt: string | null; dueDay: number
   status: StudentStatus
@@ -100,18 +100,18 @@ type SimpleGroup = { id: string; name: string }
 
 type FilterTab = "ACTIVOS" | "TODOS"
 type NewForm = {
-  firstName: string; lastName: string; dueDay: string; phone: string; groupId: string
+  firstName: string; lastName: string; dueDay: string; phone1: string; phone2: string; groupId: string
   fichaFile: File | null; aptoFile: File | null
   isTrial: boolean; trialEndsAt: string
 }
-type EditForm = { firstName: string; lastName: string; dueDay: string; phone: string }
+type EditForm = { firstName: string; lastName: string; dueDay: string; phone1: string; phone2: string }
 
 const EMPTY_FORM: NewForm = {
-  firstName: "", lastName: "", dueDay: "", phone: "", groupId: "",
+  firstName: "", lastName: "", dueDay: "", phone1: "", phone2: "", groupId: "",
   fichaFile: null, aptoFile: null,
   isTrial: false, trialEndsAt: "",
 }
-const EMPTY_EDIT: EditForm = { firstName: "", lastName: "", dueDay: "", phone: "" }
+const EMPTY_EDIT: EditForm = { firstName: "", lastName: "", dueDay: "", phone1: "", phone2: "" }
 
 export default function StudentsView({ gymId }: { gymId: string }) {
   const { data: students, loading, error, refetch } = useFetch<Student[]>(
@@ -133,9 +133,16 @@ export default function StudentsView({ gymId }: { gymId: string }) {
 
   useEffect(() => {
     if (!showForm) return
-    fetch(`/api/groups?gymId=${gymId}`).then((r) => r.ok ? r.json() : []).then((groups) =>
-      setGymGroups(groups.map((g: { id: string; name: string }) => ({ id: g.id, name: g.name })))
-    )
+    const controller = new AbortController()
+    fetch(`/api/groups?gymId=${gymId}`, { signal: controller.signal })
+      .then((r) => r.ok ? r.json() : [])
+      .then((groups) =>
+        setGymGroups(groups.map((g: { id: string; name: string }) => ({ id: g.id, name: g.name })))
+      )
+      .catch((err) => {
+        if (err instanceof Error && err.name === "AbortError") return
+      })
+    return () => controller.abort()
   }, [showForm, gymId])
 
   // Detail panel
@@ -180,7 +187,7 @@ export default function StudentsView({ gymId }: { gymId: string }) {
   const displayed = base
     .filter((s) =>
       `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
-      (s.phone ?? "").includes(search)
+      s.phone1.includes(search)
     )
     .sort((a, b) => {
       let cmp = 0
@@ -208,8 +215,12 @@ export default function StudentsView({ gymId }: { gymId: string }) {
     await loadFiles(s.id)
     setPaymentsLoading(true)
     fetch(`/api/payments?gymId=${gymId}&studentId=${s.id}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Error al cargar los pagos.")
+        return r.json()
+      })
       .then((data) => { if (Array.isArray(data)) setStudentPayments(data) })
+      .catch(() => {})
       .finally(() => setPaymentsLoading(false))
   }
 
@@ -248,10 +259,10 @@ export default function StudentsView({ gymId }: { gymId: string }) {
       if (res.ok) { await loadFiles(selectedDetail.id); await refetch() }
       else {
         const d = await res.json().catch(() => ({}))
-        setFilesError(d?.error ?? "Error al subir el archivo.")
+        setFilesError(d?.error ?? "No se pudo subir el archivo.")
       }
     } catch {
-      setFilesError("Error al subir el archivo.")
+      setFilesError("Error de conexión. Intentá de nuevo.")
     } finally {
       setUploadingType(null)
     }
@@ -274,7 +285,8 @@ export default function StudentsView({ gymId }: { gymId: string }) {
       firstName: selectedDetail.firstName,
       lastName: selectedDetail.lastName,
       dueDay: String(selectedDetail.dueDay),
-      phone: selectedDetail.phone ?? "",
+      phone1: selectedDetail.phone1,
+      phone2: selectedDetail.phone2 ?? "",
     })
     setShowEditModal(true)
     setEditError(null)
@@ -294,7 +306,9 @@ export default function StudentsView({ gymId }: { gymId: string }) {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         firstName: editForm.firstName.trim(), lastName: editForm.lastName.trim(),
-        dueDay: day, phone: editForm.phone.trim() || null,
+        dueDay: day,
+        phone1: editForm.phone1.trim(),
+        phone2: editForm.phone2.trim() || null,
       }),
     })
     if (res.ok) {
@@ -306,7 +320,7 @@ export default function StudentsView({ gymId }: { gymId: string }) {
       setSelectedDetail(updated)
     } else {
       const d = await res.json().catch(() => ({}))
-      setEditError(d?.error ?? "Error al actualizar.")
+      setEditError(d?.error ?? "No se pudo actualizar el alumno.")
     }
     setEditSubmitting(false)
   }
@@ -342,12 +356,14 @@ export default function StudentsView({ gymId }: { gymId: string }) {
     const day = Number(form.dueDay)
     if (isNaN(day) || day < 1 || day > 31) { setFormError("El día de cobro debe ser entre 1 y 31."); return }
     if (form.isTrial && !form.trialEndsAt) { setFormError("Ingresá la fecha de fin del período de prueba."); return }
+    if (!form.phone1.trim()) { setFormError("El teléfono principal es obligatorio."); return }
 
     setSubmitting(true)
     const body: Record<string, unknown> = {
       gymId, firstName: form.firstName.trim(), lastName: form.lastName.trim(), dueDay: day,
+      phone1: form.phone1.trim(),
     }
-    if (form.phone.trim()) body.phone = form.phone.trim()
+    if (form.phone2.trim()) body.phone2 = form.phone2.trim()
     if (form.isTrial) {
       body.status = "PRUEBA"
       body.trialEndsAt = new Date(form.trialEndsAt).toISOString()
@@ -358,7 +374,7 @@ export default function StudentsView({ gymId }: { gymId: string }) {
     })
     if (!res.ok) {
       const d = await res.json().catch(() => ({}))
-      setFormError(d?.error ?? "Error al crear el alumno.")
+      setFormError(d?.error ?? "No se pudo crear el alumno.")
       setSubmitting(false)
       return
     }
@@ -471,8 +487,11 @@ export default function StudentsView({ gymId }: { gymId: string }) {
         <FormField label="Día de cobro" required>
           <NumberInput integer value={form.dueDay} onChange={(e) => setForm((f) => ({ ...f, dueDay: e.target.value }))} placeholder="Ej: 10" />
         </FormField>
-        <FormField label="Teléfono">
-          <Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="Ej: 11 1234-5678" />
+        <FormField label="Teléfono principal (WhatsApp)" required>
+          <Input value={form.phone1} onChange={(e) => setForm((f) => ({ ...f, phone1: e.target.value }))} placeholder="Ej: 11 1234-5678" />
+        </FormField>
+        <FormField label="Teléfono secundario">
+          <Input value={form.phone2} onChange={(e) => setForm((f) => ({ ...f, phone2: e.target.value }))} placeholder="Ej: 11 8765-4321" />
         </FormField>
         <FormField label="Agregar a grupo">
           <Select value={form.groupId} onChange={(e) => setForm((f) => ({ ...f, groupId: e.target.value }))}>
@@ -580,7 +599,7 @@ export default function StudentsView({ gymId }: { gymId: string }) {
               )}
             </div>
           )},
-          { key: "phone", header: "Tel.", render: (s) => <span className="text-[#68685F]">{s.phone ?? <span className="text-[#A5A49D]">—</span>}</span> },
+          { key: "phone1", header: "Tel.", render: (s) => <span className="text-[#68685F]">{s.phone1}</span> },
           { key: "ficha", header: "Ficha alumno", render: (s) => s.files.some((f) => f.fileType === "FICHA")
             ? <span className="text-xs font-medium text-emerald-700">Cargado</span>
             : <span className="text-xs text-[#A5A49D]">No cargado</span> },
@@ -679,12 +698,18 @@ export default function StudentsView({ gymId }: { gymId: string }) {
                         </div>
                       </div>
 
-                      {(selectedDetail.phone || selectedDetail.emergencyContact || selectedDetail.emergencyPhone) && (
+                      {(selectedDetail.phone1 || selectedDetail.phone2 || selectedDetail.emergencyContact || selectedDetail.emergencyPhone) && (
                         <div className="rounded-lg border border-[#E5E4E0] bg-[#FAFAF9] px-3 py-2.5 space-y-2">
-                          {selectedDetail.phone && (
+                          {selectedDetail.phone1 && (
                             <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#A5A49D]">Teléfono</p>
-                              <p className="mt-0.5 text-sm text-[#111110]">{selectedDetail.phone}</p>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#A5A49D]">Teléfono (WhatsApp)</p>
+                              <p className="mt-0.5 text-sm text-[#111110]">{selectedDetail.phone1}</p>
+                            </div>
+                          )}
+                          {selectedDetail.phone2 && (
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#A5A49D]">Teléfono 2</p>
+                              <p className="mt-0.5 text-sm text-[#111110]">{selectedDetail.phone2}</p>
                             </div>
                           )}
                           {selectedDetail.emergencyContact && (
@@ -905,8 +930,11 @@ export default function StudentsView({ gymId }: { gymId: string }) {
         <FormField label="Día de cobro" required>
           <NumberInput integer value={editForm.dueDay} onChange={(e) => setEditForm((f) => ({ ...f, dueDay: e.target.value }))} placeholder="Ej: 10" />
         </FormField>
-        <FormField label="Teléfono">
-          <Input value={editForm.phone} onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} placeholder="Ej: 11 1234-5678" />
+        <FormField label="Teléfono principal (WhatsApp)" required>
+          <Input value={editForm.phone1} onChange={(e) => setEditForm((f) => ({ ...f, phone1: e.target.value }))} placeholder="Ej: 11 1234-5678" />
+        </FormField>
+        <FormField label="Teléfono secundario">
+          <Input value={editForm.phone2} onChange={(e) => setEditForm((f) => ({ ...f, phone2: e.target.value }))} placeholder="Ej: 11 8765-4321" />
         </FormField>
       </FormModal>
 

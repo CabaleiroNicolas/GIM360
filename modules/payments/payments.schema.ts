@@ -11,7 +11,7 @@ export const updatePaymentSchema = z.object({
   paymentMethod: z.nativeEnum(PaymentMethod).optional(),
   paidAt: z.string().datetime().optional(),
   notes: z.string().optional(),
-  amount: z.number().positive().optional(),
+  amount: z.number().positive().multipleOf(0.01).optional(),
 })
 
 export type GeneratePaymentsInput = z.infer<typeof generatePaymentsSchema>

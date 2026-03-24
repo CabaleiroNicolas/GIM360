@@ -11,6 +11,7 @@ import { FormField } from "@/components/ui/FormField"
 import { FormModal } from "@/components/ui/FormModal"
 import { Tabs } from "@/components/ui/Tabs"
 import { DataTable } from "@/components/ui/DataTable"
+import { Skeleton } from "@/components/ui/Skeleton"
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -63,15 +64,43 @@ export default function GroupDetailView({ gymId, groupId }: { gymId: string; gro
 
   const fetchGroup = useCallback(async () => {
     setLoading(true); setError(null)
-    const res = await fetch(`/api/groups/${groupId}?gymId=${gymId}`)
-    if (res.ok) setGroup(await res.json())
-    else setError("No se pudo cargar el grupo.")
-    setLoading(false)
+    try {
+      const res = await fetch(`/api/groups/${groupId}?gymId=${gymId}`)
+      if (res.ok) setGroup(await res.json())
+      else setError("No se pudo cargar el grupo.")
+    } catch {
+      setError("Error de conexión al cargar el grupo.")
+    } finally {
+      setLoading(false)
+    }
   }, [gymId, groupId])
 
-  useEffect(() => { fetchGroup() }, [fetchGroup])
+  useEffect(() => {
+    const controller = new AbortController()
+    setLoading(true); setError(null)
+    fetch(`/api/groups/${groupId}?gymId=${gymId}`, { signal: controller.signal })
+      .then((res) => {
+        if (res.ok) return res.json()
+        throw new Error("No se pudo cargar el grupo.")
+      })
+      .then((data) => { setGroup(data); setLoading(false) })
+      .catch((err) => {
+        if (err instanceof Error && err.name === "AbortError") return
+        setError(err instanceof Error ? err.message : "Error de conexión al cargar el grupo.")
+        setLoading(false)
+      })
+    return () => controller.abort()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gymId, groupId])
 
-  if (loading) return <div className="py-20 text-center text-sm text-[#A5A49D]">Cargando…</div>
+  if (loading) return (
+    <div className="rounded-xl border border-[#E5E4E0] bg-white px-6 py-8 space-y-4">
+      <Skeleton className="h-5 w-1/3" />
+      <Skeleton className="h-3.5 w-2/3" />
+      <Skeleton className="h-3.5 w-1/2" />
+      <Skeleton className="h-3.5 w-3/5" />
+    </div>
+  )
   if (error || !group) return <div className="py-20 text-center text-sm text-red-600">{error ?? "Grupo no encontrado."}</div>
 
   return (
@@ -690,26 +719,36 @@ function StudentsTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
 
   // Fetch payment status for current period to count paid students in this group
   useEffect(() => {
+    const controller = new AbortController()
     const now = new Date()
     const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
-    fetch(`/api/payments?gymId=${gymId}&period=${period}`)
+    fetch(`/api/payments?gymId=${gymId}&period=${period}`, { signal: controller.signal })
       .then((r) => r.ok ? r.json() : [])
       .then((payments: { studentId: string; status: string }[]) => {
         const groupStudentIds = new Set(group.students.map((s) => s.student.id))
         const paid = payments.filter((p) => groupStudentIds.has(p.studentId) && p.status === "PAID").length
         setPaidCount(paid)
       })
-      .catch(() => setPaidCount(null))
+      .catch((err) => {
+        if (err instanceof Error && err.name === "AbortError") return
+        setPaidCount(null)
+      })
+    return () => controller.abort()
   }, [gymId, group.students])
 
   async function loadGymStudents() {
     setLoadingPicker(true)
-    const res = await fetch(`/api/students?gymId=${gymId}`)
-    if (res.ok) {
-      const data: GymStudent[] = await res.json()
-      setGymStudents(data.filter((s) => !enrolledIds.has(s.id)))
+    try {
+      const res = await fetch(`/api/students?gymId=${gymId}`)
+      if (res.ok) {
+        const data: GymStudent[] = await res.json()
+        setGymStudents(data.filter((s) => !enrolledIds.has(s.id)))
+      }
+    } catch {
+      // silently fail — picker simply stays empty
+    } finally {
+      setLoadingPicker(false)
     }
-    setLoadingPicker(false)
   }
 
   function handleShowPicker() {
@@ -1079,12 +1118,17 @@ function TrainersTab({ group, gymId, groupId, onRefresh }: SubTabProps) {
 
   async function loadGymTrainers() {
     setLoadingPicker(true)
-    const res = await fetch(`/api/trainers?gymId=${gymId}`)
-    if (res.ok) {
-      const data: GymTrainer[] = await res.json()
-      setGymTrainers(data.filter((t) => !assignedIds.has(t.id)))
+    try {
+      const res = await fetch(`/api/trainers?gymId=${gymId}`)
+      if (res.ok) {
+        const data: GymTrainer[] = await res.json()
+        setGymTrainers(data.filter((t) => !assignedIds.has(t.id)))
+      }
+    } catch {
+      // silently fail — picker simply stays empty
+    } finally {
+      setLoadingPicker(false)
     }
-    setLoadingPicker(false)
   }
 
   function handleShowAssignForm() {
