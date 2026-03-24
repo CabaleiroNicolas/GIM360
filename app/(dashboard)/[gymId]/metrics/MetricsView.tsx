@@ -77,16 +77,16 @@ function MetricCard({ label, value, context, percentage, barColor, size = "norma
 
 function StackedBar({ segments }: { segments: { label: string; value: string; pct: number; color: string }[] }) {
   return (
-    <div className="rounded-xl border border-[#E5E4E0] bg-white px-5 py-4 space-y-3">
+    <div className="rounded-xl border border-[#E5E4E0] bg-white px-4 py-4 sm:px-5 space-y-3">
       <div className="flex h-3 w-full overflow-hidden rounded-full bg-[#F0EFEB]">
         {segments.map((s, i) => (
           <div key={i} className="h-full transition-all duration-500" style={{ width: `${s.pct}%`, backgroundColor: s.color }} />
         ))}
       </div>
-      <div className="flex justify-between text-xs">
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:justify-between text-xs">
         {segments.map((s, i) => (
           <div key={i} className="flex items-center gap-1.5">
-            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
+            <div className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
             <span className="text-[#68685F]">{s.label}</span>
             <span className="font-mono font-semibold text-[#111110]">{s.value}</span>
             <span className="text-[#A5A49D]">({Math.round(s.pct)}%)</span>
@@ -274,16 +274,27 @@ function formatPeriod(period: string) {
   return date.toLocaleDateString("es-AR", { month: "long", year: "numeric" })
 }
 
+function toYearMonth(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+}
+
 export default function MetricsView({ gymId }: { gymId: string }) {
   const now = new Date()
-  const maxPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+  const maxPeriod = toYearMonth(now)
   const [period, setPeriod] = useState(maxPeriod)
+  const [minPeriod, setMinPeriod] = useState<string | undefined>(undefined)
   const [activeView, setActiveView] = useState<MetricView>("gimnasio")
   const [gymMetrics, setGymMetrics] = useState<GymMetrics | null>(null)
   const [groupMetrics, setGroupMetrics] = useState<GroupMetrics[]>([])
   const [selectedGroup, setSelectedGroup] = useState<GroupMetrics | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch(`/api/gyms/${gymId}`).then(r => r.json()).then(g => {
+      if (g?.createdAt) setMinPeriod(toYearMonth(new Date(g.createdAt)))
+    }).catch(() => {})
+  }, [gymId])
 
   const fetchMetrics = useCallback(async () => {
     setLoading(true); setError(null)
@@ -328,7 +339,12 @@ export default function MetricsView({ gymId }: { gymId: string }) {
         </div>
         <div className="flex items-center gap-2">
           <Label htmlFor="period">Mes</Label>
-          <Input id="period" type="month" value={period} max={maxPeriod} onChange={(e) => setPeriod(e.target.value > maxPeriod ? maxPeriod : e.target.value)} className="py-2" />
+          <Input id="period" type="month" value={period} min={minPeriod} max={maxPeriod} onChange={(e) => {
+            let v = e.target.value
+            if (v > maxPeriod) v = maxPeriod
+            if (minPeriod && v < minPeriod) v = minPeriod
+            setPeriod(v)
+          }} className="py-2" />
         </div>
       </div>
 

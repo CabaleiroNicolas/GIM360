@@ -13,7 +13,7 @@ function parsePeriod(period: string): Date {
 const paymentWithStudent = {
   include: {
     student: {
-      select: { id: true, firstName: true, lastName: true, dueDay: true },
+      select: { id: true, firstName: true, lastName: true, dueDay: true, phone: true },
     },
   },
 } as const
