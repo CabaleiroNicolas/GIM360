@@ -17,36 +17,94 @@ function parseDate(dateStr: string): Date {
   return new Date(Date.UTC(y, m - 1, d))
 }
 
+function floorToUTCDay(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+}
+
 /**
- * Genera registros de asistencia vacíos (detail: null) para todos los grupos
- * del gym que tienen horario ese día. Idempotente via skipDuplicates.
+ * Genera registros de asistencia vacíos (detail: null) para todos los días
+ * donde los grupos del gym tenían horario, desde el último registro existente
+ * hasta `upToDate` inclusive.
+ *
+ * - Primera apertura: va desde el startDate del horario más antiguo (máx. 1 año atrás).
+ * - Aperturas posteriores: solo genera desde el día siguiente al último registro.
+ * - Idempotente via skipDuplicates como red de seguridad.
  */
-export async function generateDailyAttendance(gymId: string, date: string) {
-  const dateObj = parseDate(date)
-  const dayOfWeek = JS_DAY_TO_ENUM[dateObj.getUTCDay()]
+export async function ensureAttendanceUpToDate(gymId: string, upToDate: string) {
+  const upToDateObj = parseDate(upToDate)
 
   const groups = await db.group.findMany({
-    where: {
-      gymId,
+    where: { gymId },
+    select: {
+      id: true,
       schedules: {
-        some: {
-          weekDays: { has: dayOfWeek },
-          startDate: { lte: dateObj },
-          OR: [{ endDate: null }, { endDate: { gte: dateObj } }],
-        },
+        select: { weekDays: true, startDate: true, endDate: true },
       },
     },
-    select: { id: true },
   })
 
-  if (groups.length > 0) {
-    await db.attendance.createMany({
-      data: groups.map((g) => ({ gymId, groupId: g.id, date: dateObj })),
-      skipDuplicates: true,
-    })
+  const scheduledGroups = groups.filter((g) => g.schedules.length > 0)
+  if (scheduledGroups.length === 0) return getAttendanceByGymDate(gymId, upToDate)
+
+  // Determinar la fecha desde donde generar
+  const lastRecord = await db.attendance.findFirst({
+    where: { gymId, date: { lte: upToDateObj } },
+    orderBy: { date: "desc" },
+    select: { date: true },
+  })
+
+  const oneYearAgo = new Date(upToDateObj)
+  oneYearAgo.setUTCFullYear(oneYearAgo.getUTCFullYear() - 1)
+
+  let fromDate: Date
+  if (lastRecord) {
+    // Solo generar lo que falta: desde el día siguiente al último registro (máx. 1 año atrás)
+    const next = floorToUTCDay(lastRecord.date)
+    next.setUTCDate(next.getUTCDate() + 1)
+    fromDate = next < oneYearAgo ? oneYearAgo : next
+  } else {
+    // Primera vez: ir desde el startDate más antiguo (máx. 1 año atrás)
+    fromDate = upToDateObj
+    for (const group of scheduledGroups) {
+      for (const schedule of group.schedules) {
+        const sd = floorToUTCDay(schedule.startDate)
+        const effectiveStart = sd < oneYearAgo ? oneYearAgo : sd
+        if (effectiveStart < fromDate) fromDate = effectiveStart
+      }
+    }
   }
 
-  return getAttendanceByGymDate(gymId, date)
+  // Si ya estamos al día, no hay nada que generar
+  if (fromDate > upToDateObj) return getAttendanceByGymDate(gymId, upToDate)
+
+  // Iterar cada día e identificar qué grupos tienen horario activo
+  const toInsert: { gymId: string; groupId: string; date: Date }[] = []
+  const cursor = new Date(fromDate)
+
+  while (cursor <= upToDateObj) {
+    const dayOfWeek = JS_DAY_TO_ENUM[cursor.getUTCDay()]
+    const cursorDay = new Date(cursor)
+
+    for (const group of scheduledGroups) {
+      const hasSchedule = group.schedules.some(
+        (s) =>
+          s.weekDays.includes(dayOfWeek) &&
+          floorToUTCDay(s.startDate) <= cursorDay &&
+          (s.endDate === null || floorToUTCDay(s.endDate) >= cursorDay),
+      )
+      if (hasSchedule) {
+        toInsert.push({ gymId, groupId: group.id, date: cursorDay })
+      }
+    }
+
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  }
+
+  if (toInsert.length > 0) {
+    await db.attendance.createMany({ data: toInsert, skipDuplicates: true })
+  }
+
+  return getAttendanceByGymDate(gymId, upToDate)
 }
 
 /** Todos los registros de asistencia de un gym en una fecha, con info del grupo. */

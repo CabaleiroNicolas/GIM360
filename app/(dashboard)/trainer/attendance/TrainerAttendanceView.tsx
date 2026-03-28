@@ -90,7 +90,6 @@ function getScheduleTimeForToday(schedules: ScheduleInfo[]): string {
 
 export default function TrainerAttendanceView() {
   // ── State: data ──
-  const [profile, setProfile] = useState<TrainerProfile | null>(null)
   const [records, setRecords] = useState<AttendanceRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -113,24 +112,16 @@ export default function TrainerAttendanceView() {
         const profileRes = await fetch("/api/trainers/me")
         if (!profileRes.ok) throw new Error("No se pudo cargar tu perfil.")
         const profileData: TrainerProfile = await profileRes.json()
-        setProfile(profileData)
-
         const date = todayDateStr()
         const gymId = profileData.gym.id
 
-        let attendanceRes = await fetch(`/api/attendance?gymId=${gymId}&date=${date}`)
-        if (!attendanceRes.ok) throw new Error("No se pudo cargar la asistencia.")
-        let attendanceData: AttendanceRecord[] = await attendanceRes.json()
-
-        if (attendanceData.length === 0) {
-          const postRes = await fetch("/api/attendance", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ gymId, date }),
-          })
-          if (!postRes.ok) throw new Error("No se pudo generar la asistencia del día.")
-          attendanceData = await postRes.json()
-        }
+        const postRes = await fetch("/api/attendance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ gymId, date }),
+        })
+        if (!postRes.ok) throw new Error("No se pudo cargar la asistencia del día.")
+        const attendanceData: AttendanceRecord[] = await postRes.json()
 
         setRecords(attendanceData)
       } catch (err) {
@@ -158,15 +149,15 @@ export default function TrainerAttendanceView() {
       const data: StudentEntry[] = await res.json()
       setStudents(data)
 
-      // Pre-fill presence from existing detail, defaulting to true
+      // Pre-fill presence from existing detail; default to false (absent) for new attendance
       const initial: Record<string, boolean> = {}
       for (const entry of data) {
         const sid = entry.student.id
         if (record.detail) {
           const found = record.detail.students.find((s) => s.studentId === sid)
-          initial[sid] = found !== undefined ? found.present : true
+          initial[sid] = found !== undefined ? found.present : false
         } else {
-          initial[sid] = true
+          initial[sid] = false
         }
       }
       setPresence(initial)
@@ -191,7 +182,7 @@ export default function TrainerAttendanceView() {
     const payload = students.map((entry) => ({
       studentId: entry.student.id,
       studentName: `${entry.student.firstName} ${entry.student.lastName}`,
-      present: presence[entry.student.id] ?? true,
+      present: presence[entry.student.id] ?? false,
     }))
 
     try {
@@ -250,7 +241,7 @@ export default function TrainerAttendanceView() {
           <div className="mx-auto max-w-2xl px-4 sm:px-6 h-14 flex items-center gap-3">
             <button
               onClick={handleBack}
-              className="flex items-center justify-center min-h-[44px] min-w-[44px] -ml-2 text-[#68685F] hover:text-[#111110] transition-colors"
+              className="cursor-pointer flex items-center justify-center min-h-[44px] min-w-[44px] -ml-2 text-[#68685F] hover:text-[#111110] transition-colors"
               aria-label="Volver a grupos"
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -295,19 +286,19 @@ export default function TrainerAttendanceView() {
               <div className="rounded-xl border border-[#E5E4E0] bg-white overflow-hidden">
                 {students.map((entry, i) => {
                   const sid = entry.student.id
-                  const isPresent = presence[sid] ?? true
+                  const isPresent = presence[sid] ?? false
                   return (
                     <button
                       key={sid}
                       type="button"
                       onClick={() => togglePresence(sid)}
                       className={[
-                        "w-full flex items-center justify-between px-4 py-3 min-h-[52px] text-left transition-colors",
+                        "cursor-pointer w-full flex items-center justify-between px-4 py-3 min-h-[52px] text-left transition-colors",
                         "hover:bg-[#FAFAF9] active:bg-[#F0EFEB]",
                         i > 0 ? "border-t border-[#F0EFEB]" : "",
                       ].join(" ")}
                     >
-                      <span className={["text-sm font-medium", isPresent ? "text-[#111110]" : "text-[#A5A49D] line-through"].join(" ")}>
+                      <span className={["text-sm font-medium", isPresent ? "text-[#111110]" : "text-[#A5A49D]"].join(" ")}>
                         {entry.student.lastName}, {entry.student.firstName}
                       </span>
                       {/* Checkbox indicator */}
@@ -343,7 +334,7 @@ export default function TrainerAttendanceView() {
                   type="button"
                   onClick={handleSubmit}
                   disabled={submitting}
-                  className="w-full min-h-[48px] rounded-lg bg-[#111110] px-4 py-3 text-sm font-medium text-white hover:bg-[#2A2A28] disabled:opacity-40 transition-colors"
+                  className="cursor-pointer w-full min-h-[48px] rounded-lg bg-[#111110] px-4 py-3 text-sm font-medium text-white hover:bg-[#2A2A28] disabled:opacity-40 transition-colors"
                 >
                   {submitting
                     ? "Guardando…"
@@ -423,7 +414,7 @@ export default function TrainerAttendanceView() {
                     key={record.id}
                     type="button"
                     onClick={() => handleSelectRecord(record)}
-                    className="w-full text-left rounded-xl border border-[#E5E4E0] bg-white px-4 py-4 min-h-[72px] flex items-center justify-between gap-3 hover:bg-[#FAFAF9] active:bg-[#F0EFEB] transition-colors"
+                    className="cursor-pointer w-full text-left rounded-xl border border-[#E5E4E0] bg-white px-4 py-4 min-h-[72px] flex items-center justify-between gap-3 hover:bg-[#FAFAF9] active:bg-[#F0EFEB] transition-colors"
                   >
                     {/* Left: name + time */}
                     <div className="flex flex-col gap-1 min-w-0">

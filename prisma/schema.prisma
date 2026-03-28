@@ -115,7 +115,7 @@ model FixedExpense {
 model Trainer {
   id           String       @id @default(cuid())
   userId       String?      @unique
-  user         User?        @relation(fields: [userId], references: [id])
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   gymId        String
   gym          Gym          @relation(fields: [gymId], references: [id], onDelete: Cascade)
   name         String
@@ -230,7 +230,7 @@ model Payment {
   gymId         String
   gym           Gym            @relation(fields: [gymId], references: [id], onDelete: Cascade)
   studentId     String
-  student       Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student       Student        @relation(fields: [studentId], references: [id], onDelete: Restrict)
   period        DateTime       // first day of the month: 2026-04-01T00:00:00Z
   amount        Decimal        @db.Decimal(10, 2)
   status        PaymentStatus  @default(PENDING)

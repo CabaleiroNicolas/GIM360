@@ -3,7 +3,7 @@ import { UserRole } from "@/app/generated/prisma/client"
 import { withAuth } from "@/lib/with-auth"
 import { gymBelongsToUser } from "@/modules/belongs/belongs.service"
 import {
-  generateDailyAttendance,
+  ensureAttendanceUpToDate,
   getAttendanceByGymDate,
   getTrainerAttendanceForDate,
 } from "@/modules/attendance/attendance.service"
@@ -40,7 +40,7 @@ export const POST = withAuth([UserRole.TRAINER, UserRole.OWNER], async (req, ses
   if (!(await gymBelongsToUser(gymId, session.user.id)))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
-  const records = await generateDailyAttendance(gymId, date)
+  const records = await ensureAttendanceUpToDate(gymId, date)
 
   if (session.user.role === "TRAINER") {
     const trainer = await getTrainerByUserId(session.user.id)
