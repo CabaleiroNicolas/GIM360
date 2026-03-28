@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { signOut } from "next-auth/react"
+import Link from "next/link"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -112,6 +113,17 @@ export default function TrainerDashboardView() {
               <h1 className="text-2xl font-semibold text-[#111110]">Hola, {profile.name}</h1>
               <p className="mt-1 text-sm text-[#68685F]">{profile.gym.name}</p>
             </div>
+
+            {/* ── Attendance link ── */}
+            <Link
+              href="/trainer/attendance"
+              className="block rounded-xl border border-[#E5E4E0] bg-white px-5 py-4 hover:bg-[#FAFAF9] transition-colors"
+            >
+              <p className="text-sm font-medium text-[#111110]">Tomar asistencia</p>
+              <p className="mt-0.5 text-xs text-[#68685F]">
+                Registrá la asistencia de tus clases de hoy
+              </p>
+            </Link>
 
             {/* ── Stats ── */}
             <div className="grid grid-cols-2 gap-3">

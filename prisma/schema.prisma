@@ -96,6 +96,7 @@ model Gym {
   payments      Payment[]
   cashClosings  CashClosing[]
   studentFiles  StudentFile[]
+  attendances   Attendance[]
 
   @@index([ownerId])
 }
@@ -162,9 +163,10 @@ model Group {
   maxCapacity  Int?
   createdAt    DateTime @default(now())
 
-  trainers  TrainerGroup[]
-  students  StudentGroup[]
-  schedules Schedule[]
+  trainers    TrainerGroup[]
+  students    StudentGroup[]
+  schedules   Schedule[]
+  attendances Attendance[]
 
   @@index([gymId])
 }
@@ -283,4 +285,21 @@ model CashClosing {
   payments Payment[]
 
   @@index([gymId])
+}
+
+model Attendance {
+  id            String   @id @default(cuid())
+  gymId         String
+  gym           Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  groupId       String
+  group         Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  date          DateTime
+  detail        Json?
+  takenByUserId String?
+  takenByName   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([groupId, date])
+  @@index([gymId, date])
 }
