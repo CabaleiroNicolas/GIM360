@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { SkeletonMetrics } from "@/components/ui/Skeleton"
-import { Input } from "@/components/ui/Input"
-import { Label } from "@/components/ui/Label"
 import { InfoTooltip } from "@/components/ui/InfoTooltip"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -24,7 +22,7 @@ type GroupMetrics = {
 type HealthIndexMetrics = {
   score: number
   label: "Saludable" | "En desarrollo" | "Con problemas" | "Crítico"
-  dim1Rentabilidad: { score: number; maxScore: number; weightedMarginPct: number }
+  dim1Rentabilidad: { score: number; maxScore: number; groupsAboveMargin: number; totalGroups: number }
   dim2Ocupacion: {
     score: number; maxScore: number; occupancyRate: number | null
     totalStudents: number; totalCapacity: number; hasGroupsWithoutCapacity: boolean
@@ -178,8 +176,8 @@ function HealthIndexView({ health: h }: { health: HealthIndexMetrics }) {
           name="Rentabilidad"
           score={h.dim1Rentabilidad.score}
           maxScore={h.dim1Rentabilidad.maxScore}
-          metric={`Margen ponderado: ${Math.round(h.dim1Rentabilidad.weightedMarginPct * 100)}%`}
-          tooltip={`¿Cuánto queda de cada peso cobrado después de pagar a los profesores?\n\nUn margen alto significa que los grupos generan suficiente dinero para cubrir los sueldos y todavía sobra. Un margen bajo o negativo indica que los profesores cuestan más de lo que ingresa.\n\nSe pondera por ingresos: los grupos que más facturan tienen más peso en el resultado.\n\nPuntaje (máx. 35):\n≥ 50% de margen → 35 pts\n≥ 40% de margen → 25 pts\n≥ 30% de margen → 15 pts\n≥ 20% de margen → 5 pts\n< 20% de margen → 0 pts\n\nNiveles del puntaje total:\n80–100 → Saludable\n60–79 → En desarrollo\n40–59 → Con problemas\n0–39 → Crítico`}
+          metric={`Grupos con margen > 50%: ${h.dim1Rentabilidad.groupsAboveMargin} de ${h.dim1Rentabilidad.totalGroups}`}
+          tooltip={`¿Cuántos grupos generan un margen mayor al 50% después de pagar a los profesores?\n\nCada grupo que supera el 50% de margen suma 5 puntos. Los grupos por debajo no suman.\n\nPuntaje (máx. ${h.dim1Rentabilidad.maxScore}):\n5 pts por cada grupo con margen > 50%\n\nNiveles del puntaje total:\n80–100 → Saludable\n60–79 → En desarrollo\n40–59 → Con problemas\n0–39 → Crítico`}
         />
         <DimCard
           name="Ocupación"
@@ -190,21 +188,21 @@ function HealthIndexView({ health: h }: { health: HealthIndexMetrics }) {
               ? `Ocupación: ${Math.round(h.dim2Ocupacion.occupancyRate * 100)}% (${h.dim2Ocupacion.totalStudents} / ${h.dim2Ocupacion.totalCapacity} lugares)${h.dim2Ocupacion.hasGroupsWithoutCapacity ? " — algunos grupos sin capacidad" : ""}`
               : "Sin grupos con capacidad máxima configurada"
           }
-          tooltip={`¿Qué tan llenos están los grupos del gimnasio?\n\nCompara la cantidad de alumnos activos con la capacidad máxima de cada grupo. Un gimnasio con alta ocupación aprovecha mejor su infraestructura y sus profesores. Una ocupación baja significa que hay lugares disponibles que no generan ingresos.\n\nPuntaje (máx. 35):\n≥ 90% de ocupación → 35 pts\n~64% de ocupación → ~25 pts\n~45% de ocupación → ~17 pts\n~26% de ocupación → ~10 pts\n\nNiveles del puntaje total:\n80–100 → Saludable\n60–79 → En desarrollo\n40–59 → Con problemas\n0–39 → Crítico${h.dim2Ocupacion.hasGroupsWithoutCapacity ? "\n\nNota: los grupos sin capacidad máxima configurada no se incluyen en este cálculo." : ""}`}
+          tooltip={`¿Qué tan llenos están los grupos del gimnasio?\n\nCompara la cantidad de alumnos activos con la capacidad máxima de cada grupo.\n\nPuntaje (máx. 35):\n≥ 90% de ocupación → 35 pts\n75–90% → 25 pts\n60–75% → 15 pts\n50–60% → 5 pts\n< 50% → 0 pts\n\nNiveles del puntaje total:\n80–100 → Saludable\n60–79 → En desarrollo\n40–59 → Con problemas\n0–39 → Crítico${h.dim2Ocupacion.hasGroupsWithoutCapacity ? "\n\nNota: los grupos sin capacidad máxima configurada no se incluyen en este cálculo." : ""}`}
         />
         <DimCard
           name="Eficiencia de costos"
           score={h.dim3Eficiencia.score}
           maxScore={h.dim3Eficiencia.maxScore}
           metric={`Ratio de costos: ${Math.round(h.dim3Eficiencia.costRatio * 100)}% de lo cobrado`}
-          tooltip={`¿Qué parte de lo cobrado se va en gastos?\n\nSuma el costo de profesores más los gastos fijos (alquiler, servicios, etc.) y lo compara con el total cobrado. Un ratio bajo significa que el gimnasio gasta poco en relación a lo que ingresa — señal de buena eficiencia. Un ratio alto indica que casi todo lo que entra se va en costos.\n\nPuntaje (máx. 10):\n≤ 55% en costos → 10 pts\n~65% en costos → ~8 pts\n~78% en costos → ~5 pts\n≥ 100% en costos → 0 pts\n\nNiveles del puntaje total:\n80–100 → Saludable\n60–79 → En desarrollo\n40–59 → Con problemas\n0–39 → Crítico`}
+          tooltip={`¿Qué parte de lo cobrado se va en gastos?\n\nSuma el costo de profesores más los gastos fijos y lo compara con el total cobrado.\n\nPuntaje (máx. 10):\n< 50% en costos → 10 pts\n50–60% → 7 pts\n60–70% → 3 pts\n≥ 70% → 0 pts\n\nNiveles del puntaje total:\n80–100 → Saludable\n60–79 → En desarrollo\n40–59 → Con problemas\n0–39 → Crítico`}
         />
         <DimCard
           name="Ganancias"
           score={h.dim4Ganancias.score}
           maxScore={h.dim4Ganancias.maxScore}
           metric={`Margen de ganancia: ${Math.round(h.dim4Ganancias.ebitdaMargin * 100)}%`}
-          tooltip={`¿Qué queda realmente en el gimnasio al final del mes?\n\nEs la ganancia neta: lo cobrado menos los profesores y todos los gastos fijos. Si es positivo, el gimnasio genera dinero. Si es negativo, está perdiendo plata cada mes.\n\nPuntaje (máx. 20):\n≥ 30% de ganancia → 20 pts\n~20% de ganancia → ~13 pts\n~10% de ganancia → ~7 pts\n≤ 0% de ganancia → 0 pts\n\nNiveles del puntaje total:\n80–100 → Saludable\n60–79 → En desarrollo\n40–59 → Con problemas\n0–39 → Crítico`}
+          tooltip={`¿Qué queda realmente en el gimnasio al final del mes?\n\nEs la ganancia neta: lo cobrado menos los profesores y todos los gastos fijos.\n\nPuntaje (máx. 20):\n> 50% de ganancia → 20 pts\n40–50% → 15 pts\n30–40% → 10 pts\n20–30% → 5 pts\n< 20% → 0 pts\n\nNiveles del puntaje total:\n80–100 → Saludable\n60–79 → En desarrollo\n40–59 → Con problemas\n0–39 → Crítico`}
         />
       </div>
     </div>
@@ -393,10 +391,7 @@ function toYearMonth(d: Date) {
 }
 
 export default function MetricsView({ gymId }: { gymId: string }) {
-  const now = new Date()
-  const maxPeriod = toYearMonth(now)
-  const [period, setPeriod] = useState(maxPeriod)
-  const [minPeriod, setMinPeriod] = useState<string | undefined>(undefined)
+  const period = toYearMonth(new Date())
   const [activeView, setActiveView] = useState<MetricView>("optimizacion")
   const [healthMetrics, setHealthMetrics] = useState<HealthIndexMetrics | null>(null)
   const [gymMetrics, setGymMetrics] = useState<GymMetrics | null>(null)
@@ -404,22 +399,6 @@ export default function MetricsView({ gymId }: { gymId: string }) {
   const [selectedGroup, setSelectedGroup] = useState<GroupMetrics | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const controller = new AbortController()
-    fetch(`/api/gyms/${gymId}`, { signal: controller.signal })
-      .then((r) => {
-        if (!r.ok) throw new Error("Error al cargar el gimnasio.")
-        return r.json()
-      })
-      .then((g) => {
-        if (g?.createdAt) setMinPeriod(toYearMonth(new Date(g.createdAt)))
-      })
-      .catch((err) => {
-        if (err instanceof Error && err.name === "AbortError") return
-      })
-    return () => controller.abort()
-  }, [gymId])
 
   const fetchMetrics = useCallback(async (signal?: AbortSignal) => {
     setLoading(true); setError(null)
@@ -446,8 +425,6 @@ export default function MetricsView({ gymId }: { gymId: string }) {
     return () => controller.abort()
   }, [fetchMetrics])
 
-  useEffect(() => { setSelectedGroup(null) }, [period])
-
   const totalRevenue = gymMetrics ? gymMetrics.totalCollectedRevenue + gymMetrics.totalPendingRevenue : 0
   const totalCosts = gymMetrics ? gymMetrics.totalTrainerCost + gymMetrics.totalFixedExpenses : 0
   const collectedPct = totalRevenue > 0 ? (gymMetrics?.totalCollectedRevenue ?? 0) / totalRevenue * 100 : 0
@@ -462,24 +439,13 @@ export default function MetricsView({ gymId }: { gymId: string }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex items-baseline gap-3">
-            <h1 className="text-xl font-semibold text-[#111110]">Métricas</h1>
-            <span className="text-xl text-[#C8C7C3]">/</span>
-            <span className="text-xl font-semibold capitalize text-[#68685F]">{formatPeriod(period)}</span>
-          </div>
-          <p className="mt-0.5 text-sm text-[#A5A49D]">Rentabilidad y costos del gimnasio</p>
+      <div>
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-xl font-semibold text-[#111110]">Métricas</h1>
+          <span className="text-xl text-[#C8C7C3]">/</span>
+          <span className="text-xl font-semibold capitalize text-[#68685F]">{formatPeriod(period)}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Label htmlFor="period">Mes</Label>
-          <Input id="period" type="month" value={period} min={minPeriod} max={maxPeriod} onChange={(e) => {
-            let v = e.target.value
-            if (v > maxPeriod) v = maxPeriod
-            if (minPeriod && v < minPeriod) v = minPeriod
-            setPeriod(v)
-          }} className="py-2" />
-        </div>
+        <p className="mt-0.5 text-sm text-[#A5A49D]">Rentabilidad y costos del gimnasio</p>
       </div>
 
       {/* View selector */}
