@@ -126,8 +126,8 @@ export default function PaymentsView({ gymId }: { gymId: string }) {
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   type SortKey = "name" | "amount" | "due" | "status"
-  const [sortKey, setSortKey] = useState<SortKey>("name")
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
+  const [sortKey, setSortKey] = useState<SortKey>("status")
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
 
   // Payment method modal state
   const [payMethodForId, setPayMethodForId] = useState<string | null>(null)
@@ -258,7 +258,14 @@ export default function PaymentsView({ gymId }: { gymId: string }) {
     setClosingSubmitting(false)
   }
 
-  const STATUS_ORDER: Record<PaymentStatus, number> = { PENDING: 0, EXPIRED: 1, PAID: 2 }
+  // Orden asc: verificado(0) → pagado sin verificar(1) → pendiente(2) → vencido(3)
+  // Orden desc (default): vencido → pendiente → pagado sin verificar → pagado verificado
+  function statusSortKey(p: Payment): number {
+    if (p.status === "EXPIRED") return 3
+    if (p.status === "PENDING") return 2
+    if (p.status === "PAID" && !p.verified) return 1
+    return 0 // PAID + verified
+  }
   const displayed = payments
     .filter((p) => `${p.student.firstName} ${p.student.lastName}`.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
@@ -266,7 +273,7 @@ export default function PaymentsView({ gymId }: { gymId: string }) {
       if (sortKey === "name") cmp = `${a.student.lastName} ${a.student.firstName}`.localeCompare(`${b.student.lastName} ${b.student.firstName}`)
       else if (sortKey === "amount") cmp = Number(a.amount) - Number(b.amount)
       else if (sortKey === "due") cmp = dueDate(period, a.student.dueDay).getTime() - dueDate(period, b.student.dueDay).getTime()
-      else if (sortKey === "status") cmp = STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
+      else if (sortKey === "status") cmp = statusSortKey(a) - statusSortKey(b)
       return sortDir === "asc" ? cmp : -cmp
     })
 
