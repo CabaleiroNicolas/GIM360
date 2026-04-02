@@ -180,21 +180,14 @@ export default function PaymentsView({ gymId }: { gymId: string }) {
     setLoading(true)
     setMutationError(null)
     try {
-      const res = await fetch(`/api/payments?gymId=${gymId}&period=${period}`, { signal })
-      if (!res.ok) { setPayments([]); setMutationError("No se pudieron cargar los pagos."); return }
-      const data = await res.json()
-      if (Array.isArray(data) && data.length === 0) {
-        const genRes = await fetch("/api/payments", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ gymId, period }),
-          signal,
-        })
-        const genData = await genRes.json()
-        setPayments(genRes.ok ? genData : [])
-        if (!genRes.ok) setMutationError("No se pudieron cargar los pagos.")
-      } else {
-        setPayments(data)
-      }
+      const genRes = await fetch("/api/payments", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gymId, period }),
+        signal,
+      })
+      const genData = await genRes.json()
+      setPayments(genRes.ok ? genData : [])
+      if (!genRes.ok) setMutationError("No se pudieron cargar los pagos.")
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return
       setMutationError("Error de conexión. Intentá de nuevo.")
