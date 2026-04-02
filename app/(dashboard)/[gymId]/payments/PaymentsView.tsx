@@ -217,7 +217,7 @@ export default function PaymentsView({ gymId }: { gymId: string }) {
         setPayments((prev) => prev.map((p) => (p.id === id ? updated : p)))
       } else {
         const data = await res.json().catch(() => ({}))
-        setMutationError(data?.error ?? "No se pudo actualizar el pago.")
+        setMutationError(typeof data?.error === "string" ? data.error : "No se pudo actualizar el pago.")
       }
     } catch {
       setMutationError("Error de conexión. Intentá de nuevo.")
@@ -241,7 +241,7 @@ export default function PaymentsView({ gymId }: { gymId: string }) {
         await fetchPayments()
       } else {
         const data = await res.json().catch(() => ({}))
-        setMutationError(data?.error ?? "No se pudo actualizar el pago.")
+        setMutationError(typeof data?.error === "string" ? data.error : "No se pudo actualizar el pago.")
       }
     } catch {
       setMutationError("Error de conexión. Intentá de nuevo.")

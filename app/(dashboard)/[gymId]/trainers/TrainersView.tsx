@@ -348,7 +348,7 @@ export default function TrainersView({ gymId }: { gymId: string }) {
       body: JSON.stringify(patchBody),
     })
     if (res.ok) { setShowEditModal(false); await refetch() }
-    else { const d = await res.json().catch(() => ({})); setEditError(d?.error ?? "No se pudo actualizar el entrenador.") }
+    else { const d = await res.json().catch(() => ({})); setEditError(typeof d?.error === "string" ? d.error : "No se pudo actualizar el entrenador.") }
     setEditSubmitting(false)
   }
 

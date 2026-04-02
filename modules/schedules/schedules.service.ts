@@ -10,7 +10,7 @@ export async function createSchedule(data: CreateScheduleInput) {
     data: {
       ...data,
       startDate: new Date(data.startDate),
-      endDate: data.endDate ? new Date(data.endDate) : undefined,
+      endDate: data.endDate ? new Date(data.endDate) : null,
     },
   })
 }
@@ -21,7 +21,7 @@ export async function updateSchedule(id: string, data: UpdateScheduleInput) {
     data: {
       ...data,
       startDate: data.startDate ? new Date(data.startDate) : undefined,
-      endDate: data.endDate ? new Date(data.endDate) : undefined,
+      endDate: data.endDate === undefined ? undefined : data.endDate ? new Date(data.endDate) : null,
     },
   })
 }

@@ -2,7 +2,7 @@ import { db } from "@/lib/db"
 
 interface CreateCashClosingInput {
   gymId: string
-  notes?: string
+  notes?: string | null
   excludedPaymentIds?: string[]
 }
 

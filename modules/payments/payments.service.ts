@@ -102,7 +102,7 @@ export async function expireOverduePayments(gymId: string, period: string) {
   const periodDate = parsePeriod(period)
   const [year, month] = period.split("-").map(Number)
   const now = new Date()
-  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  const lastDay = new Date(year, month, 0).getDate()
 
   const payments = await db.payment.findMany({
     where: { gymId, period: periodDate, status: { in: ["PENDING", "EXPIRED"] } },
@@ -113,9 +113,9 @@ export async function expireOverduePayments(gymId: string, period: string) {
   const toRevert: string[] = []
 
   for (const p of payments) {
-    const due = new Date(Date.UTC(year, month - 1, Math.min(p.student.dueDay, lastDay)))
-    if (p.status === "PENDING" && due < now) toExpire.push(p.id)
-    else if (p.status === "EXPIRED" && due >= now) toRevert.push(p.id)
+    const due = new Date(year, month - 1, Math.min(p.student.dueDay, lastDay), 23, 59, 59)
+    if (p.status === "PENDING" && now > due) toExpire.push(p.id)
+    else if (p.status === "EXPIRED" && now <= due) toRevert.push(p.id)
   }
 
   await Promise.all([

@@ -33,7 +33,7 @@ export async function createTrainer(data: CreateTrainerInput) {
   return db.trainer.create({
     data: {
       ...data,
-      startedAt: data.startedAt ? new Date(data.startedAt) : undefined,
+      startedAt: data.startedAt ? new Date(data.startedAt) : null,
     },
   })
 }
@@ -43,7 +43,7 @@ export async function updateTrainer(id: string, data: UpdateTrainerInput) {
     where: { id },
     data: {
       ...data,
-      startedAt: data.startedAt ? new Date(data.startedAt) : undefined,
+      startedAt: data.startedAt === undefined ? undefined : data.startedAt ? new Date(data.startedAt) : null,
     },
   })
 }
